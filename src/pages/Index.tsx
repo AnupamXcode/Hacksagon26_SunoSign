@@ -9,7 +9,7 @@ import { ProfileModal } from '@/components/ProfileModal';
 import { ChatPanel, type ChatMessage } from '@/components/ChatPanel';
 import { EmergencyOverlay } from '@/components/EmergencyOverlay';
 import { QuickPhrases } from '@/components/QuickPhrases';
-import { SuggestionButtons } from '@/components/SuggestionButtons';
+import { WordBuilder } from '@/components/WordBuilder';
 
 export default function SignVoiceApp() {
   const { videoRef, isActive, error: camError, start, stop } = useCamera();
@@ -21,6 +21,7 @@ export default function SignVoiceApp() {
   const [emergency, setEmergency] = useState(false);
   const lastGestureRef = useRef('NONE');
   const gestureStableRef = useRef(0);
+  const [stableLetter, setStableLetter] = useState<string | null>(null);
 
   const addMessage = useCallback((type: 'user' | 'system', text: string) => {
     setMessages(prev => [...prev, { id: Date.now().toString(), type, text, timestamp: new Date() }]);
@@ -36,6 +37,7 @@ export default function SignVoiceApp() {
       if (gesture.gesture !== lastGestureRef.current) {
         lastGestureRef.current = gesture.gesture;
         gestureStableRef.current = 0;
+        setStableLetter(null);
       }
       return;
     }
@@ -48,18 +50,34 @@ export default function SignVoiceApp() {
     }
 
     if (gestureStableRef.current === 3) {
-      // Trigger on 3rd consecutive detection
-      addMessage('user', `Gesture: ${gesture.label}`);
-
-      if (gesture.gesture === 'TWO_FINGERS') {
-        setEmergency(true);
-        speakEmergency('I need help! Emergency!');
-      } else if (gesture.sentence) {
-        speak(gesture.sentence);
-        addMessage('system', gesture.sentence);
+      if (gesture.isAlphabet) {
+        setStableLetter(gesture.gesture);
+        addMessage('user', `Letter: ${gesture.gesture}`);
+      } else if (gesture.gesture === 'OPEN_PALM') {
+        speak('Please stop');
+        addMessage('user', 'Gesture: STOP');
+        addMessage('system', 'Please stop');
+      } else if (gesture.gesture === 'THUMBS_UP') {
+        speak('Yes');
+        addMessage('user', 'Gesture: YES');
+        addMessage('system', 'Yes');
+      } else if (gesture.gesture === 'FIST') {
+        speak('No');
+        addMessage('user', 'Gesture: NO');
+        addMessage('system', 'No');
       }
     }
   }, [gesture, isActive, addMessage]);
+
+  const handleWordComplete = useCallback((word: string, sentence: string) => {
+    addMessage('user', word);
+    addMessage('system', sentence);
+  }, [addMessage]);
+
+  const handleEmergency = useCallback(() => {
+    setEmergency(true);
+    speakEmergency('I need help! Emergency!');
+  }, []);
 
   const dismissEmergency = () => {
     setEmergency(false);
@@ -79,7 +97,7 @@ export default function SignVoiceApp() {
           </div>
           <div>
             <h1 className="text-lg font-bold text-foreground leading-tight" style={{ fontFamily: 'var(--font-display)' }}>SignVoice AI</h1>
-            <p className="text-xs text-muted-foreground">Real-time sign language assistant</p>
+            <p className="text-xs text-muted-foreground">A–Z Sign Language to Speech</p>
           </div>
         </div>
         <button
@@ -132,6 +150,13 @@ export default function SignVoiceApp() {
                     <Loader2 className="w-3 h-3 animate-spin" /> Loading hand model...
                   </div>
                 )}
+                {/* Detected gesture badge */}
+                {isActive && gesture.gesture !== 'NONE' && (
+                  <div className="absolute top-3 right-3 bg-primary/90 backdrop-blur-sm text-primary-foreground rounded-lg px-3 py-1.5 fade-in">
+                    <p className="text-lg font-bold" style={{ fontFamily: 'var(--font-mono)' }}>{gesture.label}</p>
+                    <p className="text-[10px] opacity-80">Confidence: {gesture.confidence}%</p>
+                  </div>
+                )}
               </div>
               <div className="p-4 flex items-center justify-between">
                 <Button
@@ -146,25 +171,19 @@ export default function SignVoiceApp() {
                     <div className="gesture-pulse w-3 h-3 rounded-full bg-accent" />
                     <div>
                       <p className="text-base font-bold text-foreground">{gesture.label}</p>
-                      <p className="text-xs text-muted-foreground">Confidence: {gesture.confidence}%</p>
+                      <p className="text-xs text-muted-foreground">{gesture.isAlphabet ? 'Letter detected' : 'Gesture detected'}</p>
                     </div>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Detected Output */}
-            {isActive && gesture.sentence && (
-              <div className="bg-primary/5 border border-primary/20 rounded-2xl p-5 slide-up">
-                <div className="flex items-center gap-3">
-                  <Volume2 className="w-5 h-5 text-primary flex-shrink-0" />
-                  <p className="text-xl font-bold text-foreground" style={{ fontFamily: 'var(--font-display)' }}>{gesture.sentence}</p>
-                </div>
-              </div>
-            )}
-
-            {/* Suggestions for POINT gesture */}
-            {isActive && gesture.gesture === 'POINT' && <SuggestionButtons onSpeak={handleSpeak} />}
+            {/* Word Builder */}
+            <WordBuilder
+              currentLetter={stableLetter}
+              onWordComplete={handleWordComplete}
+              onEmergency={handleEmergency}
+            />
 
             {/* Quick Phrases */}
             <div>
