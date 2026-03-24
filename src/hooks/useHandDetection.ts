@@ -21,7 +21,7 @@ function loadScript(src: string): Promise<void> {
 }
 
 export function useHandDetection(videoRef: React.RefObject<HTMLVideoElement>, canvasRef: React.RefObject<HTMLCanvasElement>, isActive: boolean) {
-  const [gesture, setGesture] = useState<GestureResult>({ gesture: 'NONE', confidence: 0, label: 'No gesture', sentence: '' });
+  const [gesture, setGesture] = useState<GestureResult>({ gesture: 'NONE', confidence: 0, label: 'No gesture', isAlphabet: false });
   const [loading, setLoading] = useState(false);
   const handsRef = useRef<any>(null);
   const rafRef = useRef<number>(0);
