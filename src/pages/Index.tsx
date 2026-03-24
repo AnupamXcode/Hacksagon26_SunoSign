@@ -1,16 +1,184 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { Camera, CameraOff, User, Hand, Volume2, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useCamera } from '@/hooks/useCamera';
+import { useHandDetection } from '@/hooks/useHandDetection';
+import { useProfile } from '@/hooks/useProfile';
+import { speak, speakEmergency, stopEmergency } from '@/lib/tts';
+import { ProfileModal } from '@/components/ProfileModal';
+import { ChatPanel, type ChatMessage } from '@/components/ChatPanel';
+import { EmergencyOverlay } from '@/components/EmergencyOverlay';
+import { QuickPhrases } from '@/components/QuickPhrases';
+import { SuggestionButtons } from '@/components/SuggestionButtons';
 
-// IMPORTANT: Fully REPLACE this with your own code
-const PlaceholderIndex = () => {
-  // PLACEHOLDER: Replace this entire return statement with the user's app.
-  // The inline background color is intentionally not part of the design system.
+export default function SignVoiceApp() {
+  const { videoRef, isActive, error: camError, start, stop } = useCamera();
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const { gesture, loading: modelLoading } = useHandDetection(videoRef, canvasRef, isActive);
+  const { profile, save: saveProfile } = useProfile();
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [emergency, setEmergency] = useState(false);
+  const lastGestureRef = useRef('NONE');
+  const gestureStableRef = useRef(0);
+
+  const addMessage = useCallback((type: 'user' | 'system', text: string) => {
+    setMessages(prev => [...prev, { id: Date.now().toString(), type, text, timestamp: new Date() }]);
+  }, []);
+
+  const handleSpeak = useCallback((text: string) => {
+    addMessage('system', text);
+  }, [addMessage]);
+
+  // Stable gesture detection: require same gesture for 3 consecutive frames
+  useEffect(() => {
+    if (!isActive || gesture.gesture === 'NONE') {
+      if (gesture.gesture !== lastGestureRef.current) {
+        lastGestureRef.current = gesture.gesture;
+        gestureStableRef.current = 0;
+      }
+      return;
+    }
+
+    if (gesture.gesture === lastGestureRef.current) {
+      gestureStableRef.current++;
+    } else {
+      lastGestureRef.current = gesture.gesture;
+      gestureStableRef.current = 1;
+    }
+
+    if (gestureStableRef.current === 3) {
+      // Trigger on 3rd consecutive detection
+      addMessage('user', `Gesture: ${gesture.label}`);
+
+      if (gesture.gesture === 'TWO_FINGERS') {
+        setEmergency(true);
+        speakEmergency('I need help! Emergency!');
+      } else if (gesture.sentence) {
+        speak(gesture.sentence);
+        addMessage('system', gesture.sentence);
+      }
+    }
+  }, [gesture, isActive, addMessage]);
+
+  const dismissEmergency = () => {
+    setEmergency(false);
+    stopEmergency();
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center" style={{ backgroundColor: '#fcfbf8' }}>
-      <img data-lovable-blank-page-placeholder="REMOVE_THIS" src="/placeholder.svg" alt="Your app will live here!" />
+    <div className="min-h-screen bg-background flex flex-col">
+      {emergency && <EmergencyOverlay onDismiss={dismissEmergency} />}
+      <ProfileModal profile={profile} onSave={saveProfile} open={profileOpen} onClose={() => setProfileOpen(false)} />
+
+      {/* Header */}
+      <header className="px-4 sm:px-6 py-4 flex items-center justify-between border-b border-border bg-card/80 backdrop-blur-md sticky top-0 z-40">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
+            <Hand className="w-5 h-5 text-primary-foreground" />
+          </div>
+          <div>
+            <h1 className="text-lg font-bold text-foreground leading-tight" style={{ fontFamily: 'var(--font-display)' }}>SignVoice AI</h1>
+            <p className="text-xs text-muted-foreground">Real-time sign language assistant</p>
+          </div>
+        </div>
+        <button
+          onClick={() => setProfileOpen(true)}
+          className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center hover:bg-muted/80 transition-colors"
+        >
+          <User className="w-5 h-5 text-muted-foreground" />
+        </button>
+      </header>
+
+      {/* Main Content */}
+      <main className="flex-1 p-4 sm:p-6 max-w-6xl mx-auto w-full">
+        <div className="grid lg:grid-cols-[1fr_360px] gap-6">
+          {/* Left Column */}
+          <div className="space-y-4">
+            {/* Camera */}
+            <div className="bg-card rounded-2xl border border-border overflow-hidden">
+              <div className="relative aspect-video bg-foreground/5">
+                <video
+                  ref={videoRef}
+                  className="w-full h-full object-cover"
+                  playsInline
+                  muted
+                  style={{ transform: 'scaleX(-1)' }}
+                />
+                <canvas
+                  ref={canvasRef}
+                  width={640}
+                  height={480}
+                  className="absolute inset-0 w-full h-full pointer-events-none"
+                  style={{ transform: 'scaleX(-1)' }}
+                />
+                {!isActive && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
+                    {camError ? (
+                      <div className="text-center px-6">
+                        <CameraOff className="w-12 h-12 text-destructive mx-auto mb-3" />
+                        <p className="text-destructive font-medium text-sm">{camError}</p>
+                      </div>
+                    ) : (
+                      <>
+                        <Camera className="w-12 h-12 text-muted-foreground/40" />
+                        <p className="text-muted-foreground text-sm">Camera is off</p>
+                      </>
+                    )}
+                  </div>
+                )}
+                {modelLoading && isActive && (
+                  <div className="absolute top-3 left-3 flex items-center gap-2 bg-card/90 backdrop-blur-sm rounded-lg px-3 py-1.5 text-xs font-medium text-foreground">
+                    <Loader2 className="w-3 h-3 animate-spin" /> Loading hand model...
+                  </div>
+                )}
+              </div>
+              <div className="p-4 flex items-center justify-between">
+                <Button
+                  onClick={isActive ? stop : start}
+                  variant={isActive ? 'destructive' : 'default'}
+                  className="rounded-xl h-11 px-6 font-semibold"
+                >
+                  {isActive ? <><CameraOff className="w-4 h-4 mr-2" /> Stop Camera</> : <><Camera className="w-4 h-4 mr-2" /> Start Camera</>}
+                </Button>
+                {isActive && gesture.gesture !== 'NONE' && (
+                  <div className="flex items-center gap-3 fade-in">
+                    <div className="gesture-pulse w-3 h-3 rounded-full bg-accent" />
+                    <div>
+                      <p className="text-base font-bold text-foreground">{gesture.label}</p>
+                      <p className="text-xs text-muted-foreground">Confidence: {gesture.confidence}%</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Detected Output */}
+            {isActive && gesture.sentence && (
+              <div className="bg-primary/5 border border-primary/20 rounded-2xl p-5 slide-up">
+                <div className="flex items-center gap-3">
+                  <Volume2 className="w-5 h-5 text-primary flex-shrink-0" />
+                  <p className="text-xl font-bold text-foreground" style={{ fontFamily: 'var(--font-display)' }}>{gesture.sentence}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Suggestions for POINT gesture */}
+            {isActive && gesture.gesture === 'POINT' && <SuggestionButtons onSpeak={handleSpeak} />}
+
+            {/* Quick Phrases */}
+            <div>
+              <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wider">Quick Phrases</h3>
+              <QuickPhrases onSpeak={handleSpeak} />
+            </div>
+          </div>
+
+          {/* Right Column - Chat */}
+          <div className="lg:h-[calc(100vh-120px)] lg:sticky lg:top-[80px] h-[400px]">
+            <ChatPanel messages={messages} />
+          </div>
+        </div>
+      </main>
     </div>
   );
-};
-
-const Index = PlaceholderIndex;
-
-export default Index;
+}
