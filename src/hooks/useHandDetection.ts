@@ -98,7 +98,7 @@ export function useHandDetection(videoRef: React.RefObject<HTMLVideoElement>, ca
           const result = classifyGesture(landmarks);
           setGesture(result);
         } else {
-          setGesture({ gesture: 'NONE', confidence: 0, label: 'No hand detected', sentence: '' });
+          setGesture({ gesture: 'NONE', confidence: 0, label: 'No hand detected', isAlphabet: false });
         }
       });
       
