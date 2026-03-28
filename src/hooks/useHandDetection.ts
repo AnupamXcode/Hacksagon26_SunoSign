@@ -20,8 +20,9 @@ function loadScript(src: string): Promise<void> {
   });
 }
 
-export function useHandDetection(videoRef: React.RefObject<HTMLVideoElement>, canvasRef: React.RefObject<HTMLCanvasElement>, isActive: boolean) {
+export function useHandDetection(videoRef: React.RefObject<HTMLVideoElement>, canvasRef: React.RefObject<HTMLCanvasElement>, isActive: boolean): { gesture: GestureResult; loading: boolean; landmarks: any[] | null } {
   const [gesture, setGesture] = useState<GestureResult>({ gesture: 'NONE', confidence: 0, label: 'No gesture', isAlphabet: false });
+  const [currentLandmarks, setCurrentLandmarks] = useState<any[] | null>(null);
   const [loading, setLoading] = useState(false);
   const handsRef = useRef<any>(null);
   const rafRef = useRef<number>(0);
@@ -97,8 +98,10 @@ export function useHandDetection(videoRef: React.RefObject<HTMLVideoElement>, ca
           drawLandmarks(canvas, landmarks, width, height);
           const result = classifyGesture(landmarks);
           setGesture(result);
+          setCurrentLandmarks(landmarks);
         } else {
           setGesture({ gesture: 'NONE', confidence: 0, label: 'No hand detected', isAlphabet: false });
+          setCurrentLandmarks(null);
         }
       });
       
@@ -140,5 +143,5 @@ export function useHandDetection(videoRef: React.RefObject<HTMLVideoElement>, ca
     return () => { cancelAnimationFrame(rafRef.current); };
   }, [isActive, initHands, detect]);
 
-  return { gesture, loading };
+  return { gesture, loading, landmarks: currentLandmarks };
 }

@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Camera, CameraOff, User, Hand, Volume2, Loader2 } from 'lucide-react';
+import { Camera, CameraOff, User, Hand, Volume2, Loader2, Hash } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCamera } from '@/hooks/useCamera';
 import { useHandDetection } from '@/hooks/useHandDetection';
@@ -10,8 +10,10 @@ import { ChatPanel, type ChatMessage } from '@/components/ChatPanel';
 import { EmergencyOverlay } from '@/components/EmergencyOverlay';
 import { QuickPhrases } from '@/components/QuickPhrases';
 import { WordBuilder } from '@/components/WordBuilder';
+import { NumberDetection } from '@/components/NumberDetection';
 
 export default function SignVoiceApp() {
+  const [mode, setMode] = useState<'alphabet' | 'numbers'>('alphabet');
   const { videoRef, isActive, error: camError, start, stop } = useCamera();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { gesture, loading: modelLoading } = useHandDetection(videoRef, canvasRef, isActive);
@@ -97,19 +99,38 @@ export default function SignVoiceApp() {
           </div>
           <div>
             <h1 className="text-lg font-bold text-foreground leading-tight" style={{ fontFamily: 'var(--font-display)' }}>SignVoice AI</h1>
-            <p className="text-xs text-muted-foreground">A–Z Sign Language to Speech</p>
+            <p className="text-xs text-muted-foreground">{mode === 'alphabet' ? 'A–Z Sign Language' : 'Number Signs 1–10'}</p>
           </div>
         </div>
-        <button
-          onClick={() => setProfileOpen(true)}
-          className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center hover:bg-muted/80 transition-colors"
-        >
-          <User className="w-5 h-5 text-muted-foreground" />
-        </button>
+        <div className="flex items-center gap-2">
+          <div className="flex bg-muted rounded-xl p-1 gap-1">
+            <button
+              onClick={() => setMode('alphabet')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${mode === 'alphabet' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              <Hand className="w-3.5 h-3.5 inline mr-1" />A–Z
+            </button>
+            <button
+              onClick={() => setMode('numbers')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${mode === 'numbers' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              <Hash className="w-3.5 h-3.5 inline mr-1" />1–10
+            </button>
+          </div>
+          <button
+            onClick={() => setProfileOpen(true)}
+            className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center hover:bg-muted/80 transition-colors"
+          >
+            <User className="w-5 h-5 text-muted-foreground" />
+          </button>
+        </div>
       </header>
 
       {/* Main Content */}
       <main className="flex-1 p-4 sm:p-6 max-w-6xl mx-auto w-full">
+        {mode === 'numbers' ? (
+          <NumberDetection />
+        ) : (
         <div className="grid lg:grid-cols-[1fr_360px] gap-6">
           {/* Left Column */}
           <div className="space-y-4">
@@ -197,6 +218,7 @@ export default function SignVoiceApp() {
             <ChatPanel messages={messages} />
           </div>
         </div>
+        )}
       </main>
     </div>
   );
