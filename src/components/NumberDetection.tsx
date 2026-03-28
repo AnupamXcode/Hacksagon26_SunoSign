@@ -3,10 +3,10 @@ import { Camera, CameraOff, Volume2, VolumeX, Hand, Loader2, Trash2, Hash } from
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useCamera } from '@/hooks/useCamera';
-import { useHandDetection } from '@/hooks/useHandDetection';
 import { useNumberDetection } from '@/hooks/useNumberDetection';
 import { speak } from '@/lib/tts';
 import { numberToWord } from '@/lib/numberGesture';
+import { useHandDetectionWithLandmarks } from '@/hooks/useHandDetectionWithLandmarks';
 
 const GESTURE_GUIDE: { number: number; fingers: string; description: string }[] = [
   { number: 1, fingers: '☝️', description: 'Only index finger up' },
@@ -24,7 +24,7 @@ const GESTURE_GUIDE: { number: number; fingers: string; description: string }[] 
 export function NumberDetection() {
   const { videoRef, isActive, error: camError, start, stop } = useCamera();
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { gesture, loading: modelLoading, landmarks } = useHandDetection(videoRef, canvasRef, isActive);
+  const { gesture, loading: modelLoading, landmarks } = useHandDetectionWithLandmarks(videoRef, canvasRef, isActive);
   const { result, history, clearHistory } = useNumberDetection(landmarks, isActive);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [showGuide, setShowGuide] = useState(false);
