@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Camera, CameraOff, User, Hand, Volume2, Loader2 } from 'lucide-react';
+import { Camera, CameraOff, User, Hand, Volume2, Loader2, Hash } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCamera } from '@/hooks/useCamera';
 import { useHandDetection } from '@/hooks/useHandDetection';
@@ -10,6 +10,7 @@ import { ChatPanel, type ChatMessage } from '@/components/ChatPanel';
 import { EmergencyOverlay } from '@/components/EmergencyOverlay';
 import { QuickPhrases } from '@/components/QuickPhrases';
 import { WordBuilder } from '@/components/WordBuilder';
+import { NumberDetection } from '@/components/NumberDetection';
 
 export default function SignVoiceApp() {
   const { videoRef, isActive, error: camError, start, stop } = useCamera();
