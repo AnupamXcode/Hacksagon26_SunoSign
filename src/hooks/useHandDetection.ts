@@ -143,5 +143,6 @@ export function useHandDetection(videoRef: React.RefObject<HTMLVideoElement>, ca
     return () => { cancelAnimationFrame(rafRef.current); };
   }, [isActive, initHands, detect]);
 
-  return { gesture, loading, landmarks: currentLandmarks };
+  const returnValue = { gesture, loading, landmarks: currentLandmarks };
+  return returnValue;
 }
