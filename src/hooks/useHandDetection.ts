@@ -20,7 +20,7 @@ function loadScript(src: string): Promise<void> {
   });
 }
 
-export function useHandDetection(videoRef: React.RefObject<HTMLVideoElement>, canvasRef: React.RefObject<HTMLCanvasElement>, isActive: boolean) {
+export function useHandDetection(videoRef: React.RefObject<HTMLVideoElement>, canvasRef: React.RefObject<HTMLCanvasElement>, isActive: boolean): { gesture: GestureResult; loading: boolean; landmarks: any[] | null } {
   const [gesture, setGesture] = useState<GestureResult>({ gesture: 'NONE', confidence: 0, label: 'No gesture', isAlphabet: false });
   const [currentLandmarks, setCurrentLandmarks] = useState<any[] | null>(null);
   const [loading, setLoading] = useState(false);
