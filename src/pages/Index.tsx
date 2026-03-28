@@ -13,6 +13,7 @@ import { WordBuilder } from '@/components/WordBuilder';
 import { NumberDetection } from '@/components/NumberDetection';
 
 export default function SignVoiceApp() {
+  const [mode, setMode] = useState<'alphabet' | 'numbers'>('alphabet');
   const { videoRef, isActive, error: camError, start, stop } = useCamera();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { gesture, loading: modelLoading } = useHandDetection(videoRef, canvasRef, isActive);
@@ -98,7 +99,7 @@ export default function SignVoiceApp() {
           </div>
           <div>
             <h1 className="text-lg font-bold text-foreground leading-tight" style={{ fontFamily: 'var(--font-display)' }}>SignVoice AI</h1>
-            <p className="text-xs text-muted-foreground">A–Z Sign Language to Speech</p>
+            <p className="text-xs text-muted-foreground">{mode === 'alphabet' ? 'A–Z Sign Language' : 'Number Signs 1–10'}</p>
           </div>
         </div>
         <button
