@@ -218,6 +218,7 @@ export default function SignVoiceApp() {
             <ChatPanel messages={messages} />
           </div>
         </div>
+        )}
       </main>
     </div>
   );
