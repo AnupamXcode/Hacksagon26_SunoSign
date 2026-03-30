@@ -6,84 +6,55 @@
 
 @layer base {
   :root {
-    --background: 220 20% 97%;
-    --foreground: 220 25% 10%;
+    /* Dark charcoal + cream/beige theme */
+    --background: 30 10% 6%;
+    --foreground: 38 30% 90%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 220 25% 10%;
+    --card: 30 8% 10%;
+    --card-foreground: 38 30% 90%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 220 25% 10%;
+    --popover: 30 8% 10%;
+    --popover-foreground: 38 30% 90%;
 
-    --primary: 200 80% 50%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 38 55% 65%;
+    --primary-foreground: 30 10% 6%;
 
-    --secondary: 220 15% 92%;
-    --secondary-foreground: 220 25% 15%;
+    --secondary: 30 8% 15%;
+    --secondary-foreground: 38 25% 80%;
 
-    --muted: 220 15% 94%;
-    --muted-foreground: 220 10% 45%;
+    --muted: 30 6% 14%;
+    --muted-foreground: 38 10% 50%;
 
-    --accent: 160 60% 45%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 160 45% 50%;
+    --accent-foreground: 30 10% 6%;
 
-    --destructive: 0 75% 55%;
+    --destructive: 0 65% 50%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 15% 88%;
-    --input: 220 15% 88%;
-    --ring: 200 80% 50%;
+    --border: 30 8% 18%;
+    --input: 30 8% 18%;
+    --ring: 38 55% 65%;
 
     --radius: 1rem;
 
-    --gesture-bg: 200 80% 50%;
-    --gesture-glow: 200 90% 60%;
+    --gesture-bg: 38 55% 65%;
+    --gesture-glow: 38 70% 70%;
     --emergency: 0 85% 55%;
     --emergency-glow: 0 90% 65%;
-    --success: 160 60% 45%;
+    --success: 160 45% 50%;
     --warning: 40 90% 55%;
 
     --font-display: 'Space Grotesk', system-ui, sans-serif;
     --font-mono: 'JetBrains Mono', monospace;
 
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
-  }
-
-  .dark {
-    --background: 220 25% 8%;
-    --foreground: 220 15% 92%;
-    --card: 220 25% 12%;
-    --card-foreground: 220 15% 92%;
-    --popover: 220 25% 12%;
-    --popover-foreground: 220 15% 92%;
-    --primary: 200 80% 55%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 220 20% 18%;
-    --secondary-foreground: 220 15% 92%;
-    --muted: 220 20% 18%;
-    --muted-foreground: 220 10% 55%;
-    --accent: 160 60% 50%;
-    --accent-foreground: 0 0% 100%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 220 20% 20%;
-    --input: 220 20% 20%;
-    --ring: 200 80% 55%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-background: 30 10% 8%;
+    --sidebar-foreground: 38 30% 90%;
+    --sidebar-primary: 38 55% 65%;
+    --sidebar-primary-foreground: 30 10% 6%;
+    --sidebar-accent: 30 6% 14%;
+    --sidebar-accent-foreground: 38 30% 90%;
+    --sidebar-border: 30 8% 18%;
+    --sidebar-ring: 38 55% 65%;
   }
 }
 
