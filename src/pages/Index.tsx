@@ -1,119 +1,100 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Camera, CameraOff, User, Hand, Volume2, Loader2, Hash } from 'lucide-react';
+import { Camera, CameraOff, User, Hand, Volume2, VolumeX, Loader2, Hash, Trash2, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCamera } from '@/hooks/useCamera';
 import { useHandDetection } from '@/hooks/useHandDetection';
 import { useProfile } from '@/hooks/useProfile';
 import { speak, speakEmergency, stopEmergency } from '@/lib/tts';
+import { classifySunoGesture, type SunoGestureResult, type SunoGestureType } from '@/lib/sunoGesture';
 import { ProfileModal } from '@/components/ProfileModal';
-import { ChatPanel, type ChatMessage } from '@/components/ChatPanel';
 import { EmergencyOverlay } from '@/components/EmergencyOverlay';
-import { QuickPhrases } from '@/components/QuickPhrases';
-import { WordBuilder } from '@/components/WordBuilder';
+import { SunoDetectionPanel } from '@/components/SunoDetectionPanel';
+import { GestureGuide } from '@/components/GestureGuide';
+import { DetectionHistory, type HistoryEntry } from '@/components/DetectionHistory';
 import { NumberDetection } from '@/components/NumberDetection';
 
 const STABILITY_FRAMES = 5;
 const COOLDOWN_MS = 2000;
 
 export default function SignVoiceApp() {
-  const [mode, setMode] = useState<'alphabet' | 'numbers'>('alphabet');
+  const [mode, setMode] = useState<'gestures' | 'numbers'>('gestures');
   const { videoRef, isActive, error: camError, start, stop } = useCamera();
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { gesture, loading: modelLoading } = useHandDetection(videoRef, canvasRef, isActive);
+  const { gesture: rawGesture, loading: modelLoading, landmarks } = useHandDetection(videoRef, canvasRef, isActive);
   const { profile, save: saveProfile } = useProfile();
   const [profileOpen, setProfileOpen] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [emergency, setEmergency] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [showGuide, setShowGuide] = useState(false);
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+
+  // Suno gesture result from landmarks
+  const [sunoResult, setSunoResult] = useState<SunoGestureResult>({
+    gesture: 'NONE', confidence: 0, label: 'No Gesture', sentence: '',
+    fingerStates: [false, false, false, false, false],
+    movement: 'static', orientation: 'neutral',
+  });
 
   // Stability state
-  const gestureBufferRef = useRef<string[]>([]);
-  const lastConfirmedRef = useRef<string>('NONE');
+  const gestureBufferRef = useRef<SunoGestureType[]>([]);
+  const lastConfirmedRef = useRef<SunoGestureType>('NONE');
   const lastConfirmTimeRef = useRef(0);
-  const [stableLetter, setStableLetter] = useState<string | null>(null);
-  const [stableConfidence, setStableConfidence] = useState(0);
-  const [stableFingerStates, setStableFingerStates] = useState<boolean[] | undefined>();
 
-  const addMessage = useCallback((type: 'user' | 'system', text: string) => {
-    setMessages(prev => [...prev, { id: Date.now().toString(), type, text, timestamp: new Date() }]);
-  }, []);
+  // Process landmarks through SunoSign gesture engine
+  useEffect(() => {
+    if (!isActive || !landmarks) return;
+    const result = classifySunoGesture(landmarks);
+    setSunoResult(result);
+  }, [isActive, landmarks]);
 
-  const handleSpeak = useCallback((text: string) => {
-    addMessage('system', text);
-  }, [addMessage]);
-
-  // Majority-voting gesture stabilization
+  // Majority-voting stabilization
   useEffect(() => {
     if (!isActive) return;
 
     const buffer = gestureBufferRef.current;
-    buffer.push(gesture.gesture);
+    buffer.push(sunoResult.gesture);
     if (buffer.length > STABILITY_FRAMES) buffer.shift();
-
     if (buffer.length < STABILITY_FRAMES) return;
 
-    // Majority vote
     const counts: Record<string, number> = {};
     for (const g of buffer) counts[g] = (counts[g] || 0) + 1;
-    let majorityGesture = 'NONE';
+    let majorityGesture: SunoGestureType = 'NONE';
     let maxCount = 0;
     for (const [g, c] of Object.entries(counts)) {
-      if (c > maxCount) { majorityGesture = g; maxCount = c; }
+      if (c > maxCount) { majorityGesture = g as SunoGestureType; maxCount = c; }
     }
 
-    if (majorityGesture === 'NONE' || maxCount < Math.ceil(STABILITY_FRAMES * 0.6)) {
-      setStableLetter(null);
-      return;
-    }
+    if (majorityGesture === 'NONE' || maxCount < Math.ceil(STABILITY_FRAMES * 0.6)) return;
 
     const now = Date.now();
-    if (majorityGesture === lastConfirmedRef.current && now - lastConfirmTimeRef.current < COOLDOWN_MS) {
-      // Same gesture within cooldown — just keep showing it, don't re-trigger
-      return;
-    }
+    if (majorityGesture === lastConfirmedRef.current && now - lastConfirmTimeRef.current < COOLDOWN_MS) return;
 
     if (majorityGesture !== lastConfirmedRef.current) {
       lastConfirmedRef.current = majorityGesture;
       lastConfirmTimeRef.current = now;
 
-      if (gesture.isAlphabet) {
-        setStableLetter(majorityGesture);
-        setStableConfidence(gesture.confidence);
-        setStableFingerStates(gesture.fingerStates);
-        addMessage('user', `Letter: ${majorityGesture}`);
-      } else if (majorityGesture === 'OPEN_PALM') {
-        speak('Please stop');
-        addMessage('user', 'Gesture: STOP');
-        addMessage('system', 'Please stop');
-        setStableLetter(null);
-      } else if (majorityGesture === 'THUMBS_UP') {
-        speak('Yes');
-        addMessage('user', 'Gesture: YES');
-        addMessage('system', 'Yes');
-        setStableLetter(null);
-      } else if (majorityGesture === 'FIST') {
-        speak('No');
-        addMessage('user', 'Gesture: NO');
-        addMessage('system', 'No');
-        setStableLetter(null);
-      } else {
-        setStableLetter(null);
+      const entry: HistoryEntry = {
+        id: Date.now().toString(),
+        gesture: majorityGesture,
+        label: sunoResult.label,
+        sentence: sunoResult.sentence,
+        timestamp: new Date(),
+      };
+      setHistory(prev => [entry, ...prev].slice(0, 20));
+
+      if (voiceEnabled && sunoResult.sentence) {
+        speak(sunoResult.sentence);
       }
     }
-  }, [gesture, isActive, addMessage]);
+  }, [sunoResult, isActive, voiceEnabled]);
 
   // Reset on camera off
   useEffect(() => {
     if (!isActive) {
       gestureBufferRef.current = [];
       lastConfirmedRef.current = 'NONE';
-      setStableLetter(null);
     }
   }, [isActive]);
-
-  const handleWordComplete = useCallback((word: string, sentence: string) => {
-    addMessage('user', word);
-    addMessage('system', sentence);
-  }, [addMessage]);
 
   const handleEmergency = useCallback(() => {
     setEmergency(true);
@@ -124,6 +105,8 @@ export default function SignVoiceApp() {
     setEmergency(false);
     stopEmergency();
   };
+
+  const clearHistory = () => setHistory([]);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -137,21 +120,27 @@ export default function SignVoiceApp() {
             <Hand className="w-5 h-5 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="text-lg font-bold text-foreground leading-tight" style={{ fontFamily: 'var(--font-display)' }}>SignVoice AI</h1>
-            <p className="text-xs text-muted-foreground">{mode === 'alphabet' ? 'A–Z Sign Language' : 'Number Signs 1–10'}</p>
+            <h1 className="text-lg font-bold text-foreground leading-tight" style={{ fontFamily: 'var(--font-display)' }}>SunoSign</h1>
+            <p className="text-xs text-muted-foreground">
+              {mode === 'gestures' ? 'Real-time Hand Sign → Text & Voice' : 'Number Signs 1–10'}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex bg-muted rounded-xl p-1 gap-1">
-            <button onClick={() => setMode('alphabet')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${mode === 'alphabet' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
-              <Hand className="w-3.5 h-3.5 inline mr-1" />A–Z
+            <button onClick={() => setMode('gestures')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${mode === 'gestures' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
+              <Hand className="w-3.5 h-3.5 inline mr-1" />Signs
             </button>
             <button onClick={() => setMode('numbers')}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${mode === 'numbers' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
               <Hash className="w-3.5 h-3.5 inline mr-1" />1–10
             </button>
           </div>
+          <button onClick={() => setShowGuide(!showGuide)}
+            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${showGuide ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}>
+            <BookOpen className="w-5 h-5" />
+          </button>
           <button onClick={() => setProfileOpen(true)}
             className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center hover:bg-muted/80 transition-colors">
             <User className="w-5 h-5 text-muted-foreground" />
@@ -160,11 +149,11 @@ export default function SignVoiceApp() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 p-4 sm:p-6 max-w-6xl mx-auto w-full">
+      <main className="flex-1 p-4 sm:p-6 max-w-7xl mx-auto w-full">
         {mode === 'numbers' ? (
           <NumberDetection />
         ) : (
-          <div className="grid lg:grid-cols-[1fr_360px] gap-6">
+          <div className="grid lg:grid-cols-[1fr_340px] gap-6">
             {/* Left Column */}
             <div className="space-y-4">
               {/* Camera */}
@@ -193,53 +182,50 @@ export default function SignVoiceApp() {
                       <Loader2 className="w-3 h-3 animate-spin" /> Loading hand model...
                     </div>
                   )}
-                  {/* Gesture badge */}
-                  {isActive && gesture.gesture !== 'NONE' && (
-                    <div className="absolute top-3 right-3 bg-primary/90 backdrop-blur-sm text-primary-foreground rounded-lg px-3 py-1.5 fade-in">
-                      <p className="text-lg font-bold" style={{ fontFamily: 'var(--font-mono)' }}>{gesture.label}</p>
-                      <p className="text-[10px] opacity-80">Confidence: {gesture.confidence}%</p>
+                  {/* Live gesture badge */}
+                  {isActive && sunoResult.gesture !== 'NONE' && (
+                    <div className="absolute top-3 right-3 bg-primary/90 backdrop-blur-sm text-primary-foreground rounded-lg px-4 py-2 fade-in">
+                      <p className="text-lg font-bold" style={{ fontFamily: 'var(--font-display)' }}>{sunoResult.label}</p>
+                      <p className="text-[10px] opacity-80">{sunoResult.sentence}</p>
                     </div>
                   )}
                 </div>
-                <div className="p-4 flex items-center justify-between">
+                <div className="p-4 flex items-center justify-between flex-wrap gap-2">
                   <Button onClick={isActive ? stop : start} variant={isActive ? 'destructive' : 'default'} className="rounded-xl h-11 px-6 font-semibold">
-                    {isActive ? <><CameraOff className="w-4 h-4 mr-2" /> Stop Camera</> : <><Camera className="w-4 h-4 mr-2" /> Start Camera</>}
+                    {isActive ? <><CameraOff className="w-4 h-4 mr-2" /> Stop</> : <><Camera className="w-4 h-4 mr-2" /> Start Camera</>}
                   </Button>
-                  {isActive && gesture.gesture !== 'NONE' && (
-                    <div className="flex items-center gap-3 fade-in">
-                      <div className="gesture-pulse w-3 h-3 rounded-full bg-accent" />
-                      <div>
-                        <p className="text-base font-bold text-foreground">{gesture.label}</p>
-                        <p className="text-xs text-muted-foreground">{gesture.isAlphabet ? 'Letter detected' : 'Gesture detected'}</p>
-                      </div>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2">
+                    <Button size="sm" variant="outline" className="rounded-xl h-9 gap-1.5"
+                      onClick={() => setVoiceEnabled(!voiceEnabled)}>
+                      {voiceEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+                      {voiceEnabled ? 'Voice On' : 'Voice Off'}
+                    </Button>
+                    <Button size="sm" variant="ghost" className="rounded-xl h-9 gap-1.5" onClick={clearHistory}>
+                      <Trash2 className="w-3.5 h-3.5" /> Clear
+                    </Button>
+                  </div>
                 </div>
               </div>
 
-              {/* Word Builder with integrated detection panel */}
-              <WordBuilder
-                currentLetter={stableLetter}
-                confidence={stableConfidence}
-                fingerStates={stableFingerStates}
-                onWordComplete={handleWordComplete}
-                onEmergency={handleEmergency}
-              />
+              {/* Detection Panel */}
+              <SunoDetectionPanel result={sunoResult} isActive={isActive} />
 
-              {/* Quick Phrases */}
-              <div>
-                <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wider">Quick Phrases</h3>
-                <QuickPhrases onSpeak={handleSpeak} />
-              </div>
+              {/* Gesture Guide (togglable) */}
+              {showGuide && <GestureGuide />}
             </div>
 
-            {/* Right Column - Chat */}
+            {/* Right Column — History */}
             <div className="lg:h-[calc(100vh-120px)] lg:sticky lg:top-[80px] h-[400px]">
-              <ChatPanel messages={messages} />
+              <DetectionHistory history={history} />
             </div>
           </div>
         )}
       </main>
+
+      {/* Footer */}
+      <footer className="px-4 py-4 border-t border-border text-center">
+        <p className="text-xs text-muted-foreground">Built for accessibility and smart communication</p>
+      </footer>
     </div>
   );
 }
