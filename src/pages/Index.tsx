@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Camera, CameraOff, User, Hand, Volume2, VolumeX, Loader2, Hash, Trash2 } from 'lucide-react';
+import { Camera, CameraOff, User, Hand, Volume2, VolumeX, Loader2, Hash, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCamera } from '@/hooks/useCamera';
 import { useHandDetection } from '@/hooks/useHandDetection';
@@ -12,15 +12,18 @@ import { EmergencyOverlay } from '@/components/EmergencyOverlay';
 import { QuickPhrases } from '@/components/QuickPhrases';
 import { WordBuilder } from '@/components/WordBuilder';
 import { NumberDetection } from '@/components/NumberDetection';
+import { PhraseDetection } from '@/components/PhraseDetection';
 
 const STABILITY_FRAMES = 5;
 const COOLDOWN_MS = 2000;
 
+type AppMode = 'alphabet' | 'numbers' | 'phrases';
+
 export default function SignVoiceApp() {
-  const [mode, setMode] = useState<'alphabet' | 'numbers'>('alphabet');
+  const [mode, setMode] = useState<AppMode>('alphabet');
   const { videoRef, isActive, error: camError, start, stop } = useCamera();
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { gesture, loading: modelLoading } = useHandDetection(videoRef, canvasRef, isActive);
+  const { gesture, loading: modelLoading, hands } = useHandDetection(videoRef, canvasRef, isActive, mode === 'phrases' ? 2 : 1);
   const { profile, save: saveProfile } = useProfile();
   const [profileOpen, setProfileOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -44,9 +47,9 @@ export default function SignVoiceApp() {
     addMessage('system', text);
   }, [addMessage, voiceEnabled]);
 
-  // Majority-voting gesture stabilization
+  // Majority-voting gesture stabilization (alphabet mode only)
   useEffect(() => {
-    if (!isActive) return;
+    if (!isActive || mode !== 'alphabet') return;
 
     const buffer = gestureBufferRef.current;
     buffer.push(gesture.gesture);
@@ -97,9 +100,9 @@ export default function SignVoiceApp() {
         setStableLetter(null);
       }
     }
-  }, [gesture, isActive, addMessage, voiceEnabled]);
+  }, [gesture, isActive, addMessage, voiceEnabled, mode]);
 
-  // Reset on camera off
+  // Reset on camera off or mode switch
   useEffect(() => {
     if (!isActive) {
       gestureBufferRef.current = [];
@@ -107,6 +110,12 @@ export default function SignVoiceApp() {
       setStableLetter(null);
     }
   }, [isActive]);
+
+  useEffect(() => {
+    gestureBufferRef.current = [];
+    lastConfirmedRef.current = 'NONE';
+    setStableLetter(null);
+  }, [mode]);
 
   const handleWordComplete = useCallback((word: string, sentence: string) => {
     addMessage('user', word);
@@ -123,33 +132,52 @@ export default function SignVoiceApp() {
     stopEmergency();
   };
 
+  const modes: { key: AppMode; label: string; icon: React.ReactNode }[] = [
+    { key: 'alphabet', label: 'A–Z', icon: <Hand className="w-3.5 h-3.5" /> },
+    { key: 'numbers', label: '1–10', icon: <Hash className="w-3.5 h-3.5" /> },
+    { key: 'phrases', label: 'Phrases', icon: <MessageSquare className="w-3.5 h-3.5" /> },
+  ];
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {emergency && <EmergencyOverlay onDismiss={dismissEmergency} />}
       <ProfileModal profile={profile} onSave={saveProfile} open={profileOpen} onClose={() => setProfileOpen(false)} />
 
       {/* Header */}
-      <header className="px-4 sm:px-6 py-4 flex items-center justify-between border-b border-border bg-card/80 backdrop-blur-md sticky top-0 z-40">
+      <header className="px-4 sm:px-6 py-3 flex items-center justify-between border-b border-border bg-card/80 backdrop-blur-md sticky top-0 z-40">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
             <Hand className="w-5 h-5 text-primary-foreground" />
           </div>
-          <div>
+          <div className="hidden sm:block">
             <h1 className="text-lg font-bold text-foreground leading-tight" style={{ fontFamily: 'var(--font-display)' }}>SignVoice AI</h1>
-            <p className="text-xs text-muted-foreground">{mode === 'alphabet' ? 'A–Z Sign Language' : 'Number Signs 1–10'}</p>
+            <p className="text-[10px] text-muted-foreground">
+              {mode === 'alphabet' ? 'A–Z Sign Language' : mode === 'numbers' ? 'Number Signs 1–10' : 'Phrase Detection'}
+            </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex bg-muted rounded-xl p-1 gap-1">
-            <button onClick={() => setMode('alphabet')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${mode === 'alphabet' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
-              <Hand className="w-3.5 h-3.5 inline mr-1" />A–Z
-            </button>
-            <button onClick={() => setMode('numbers')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${mode === 'numbers' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
-              <Hash className="w-3.5 h-3.5 inline mr-1" />1–10
-            </button>
+
+        {/* Mode Toggle — Premium Pill */}
+        <div className="flex items-center">
+          <div className="flex bg-muted rounded-2xl p-1 gap-0.5">
+            {modes.map(m => (
+              <button
+                key={m.key}
+                onClick={() => setMode(m.key)}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition-all duration-200 ${
+                  mode === m.key
+                    ? 'bg-primary text-primary-foreground shadow-md'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/80'
+                }`}
+              >
+                {m.icon}
+                <span className="hidden sm:inline">{m.label}</span>
+              </button>
+            ))}
           </div>
+        </div>
+
+        <div className="flex items-center gap-2">
           <button onClick={() => setVoiceEnabled(!voiceEnabled)}
             className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${voiceEnabled ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}>
             {voiceEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
@@ -162,9 +190,11 @@ export default function SignVoiceApp() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 p-4 sm:p-6 max-w-6xl mx-auto w-full">
+      <main className="flex-1 p-4 sm:p-6 max-w-7xl mx-auto w-full">
         {mode === 'numbers' ? (
           <NumberDetection />
+        ) : mode === 'phrases' ? (
+          <PhraseDetection />
         ) : (
           <div className="grid lg:grid-cols-[1fr_360px] gap-6">
             {/* Left Column */}
@@ -195,11 +225,20 @@ export default function SignVoiceApp() {
                       <Loader2 className="w-3 h-3 animate-spin" /> Loading hand model...
                     </div>
                   )}
-                  {/* Gesture badge */}
-                  {isActive && gesture.gesture !== 'NONE' && (
-                    <div className="absolute top-3 right-3 bg-primary/90 backdrop-blur-sm text-primary-foreground rounded-lg px-3 py-1.5 fade-in">
-                      <p className="text-lg font-bold" style={{ fontFamily: 'var(--font-mono)' }}>{gesture.label}</p>
-                      <p className="text-[10px] opacity-80">Confidence: {gesture.confidence}%</p>
+                  {/* Hand count + gesture badge */}
+                  {isActive && (
+                    <div className="absolute top-3 right-3 flex gap-2">
+                      {hands.length > 0 && (
+                        <span className="bg-accent/80 backdrop-blur-sm text-accent-foreground rounded-lg px-2.5 py-1 text-xs font-semibold fade-in">
+                          ✋ {hands.length} {hands.length === 1 ? 'hand' : 'hands'}
+                        </span>
+                      )}
+                      {gesture.gesture !== 'NONE' && (
+                        <div className="bg-primary/90 backdrop-blur-sm text-primary-foreground rounded-lg px-3 py-1 fade-in">
+                          <p className="text-sm font-bold" style={{ fontFamily: 'var(--font-mono)' }}>{gesture.label}</p>
+                          <p className="text-[9px] opacity-80">{gesture.confidence}%</p>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -236,7 +275,7 @@ export default function SignVoiceApp() {
             </div>
 
             {/* Right Column - Chat */}
-            <div className="lg:h-[calc(100vh-120px)] lg:sticky lg:top-[80px] h-[400px]">
+            <div className="lg:h-[calc(100vh-120px)] lg:sticky lg:top-[72px] h-[400px]">
               <ChatPanel messages={messages} />
             </div>
           </div>
@@ -244,8 +283,12 @@ export default function SignVoiceApp() {
       </main>
 
       {/* Footer */}
-      <footer className="px-4 py-4 border-t border-border text-center">
-        <p className="text-xs text-muted-foreground">Built for accessibility and smart communication</p>
+      <footer className="px-4 py-3 border-t border-border text-center">
+        <p className="text-[11px] text-muted-foreground">
+          {mode === 'phrases'
+            ? 'Use one or two hands for phrase detection • Capture custom gestures for extensibility'
+            : 'Use one hand for letters and numbers, two hands for phrases'}
+        </p>
       </footer>
     </div>
   );
