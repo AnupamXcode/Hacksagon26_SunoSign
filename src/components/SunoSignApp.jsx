@@ -1,6 +1,6 @@
 // SunoSign AI — Main Application Component
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Camera, CameraOff, User, Hand, Volume2, VolumeX, Loader2, Hash, MessageSquare, Sparkles, Delete, RotateCcw } from 'lucide-react';
+import { Camera, CameraOff, User, Hand, Volume2, VolumeX, Loader2, Hash, MessageSquare, Sparkles, Delete, RotateCcw, Moon, Sun } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useCamera } from '@/hooks/useCamera';
@@ -32,6 +32,15 @@ export default function SunoSignApp() {
   const [mode, setMode] = useState('alphabet');
   const [context, setContext] = useState('user');
   const [domain, setDomain] = useState('general');
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    // Check system preference or localStorage
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('theme');
+      if (saved) return saved === 'dark';
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    return true;
+  });
   const { videoRef, isActive, error: camError, start, stop } = useCamera();
   const canvasRef = useRef(null);
   const { gesture: rawGesture, loading: modelLoading, hands } = useHandDetection(videoRef, canvasRef, isActive, mode === 'phrases' ? 2 : 1);
@@ -40,6 +49,18 @@ export default function SunoSignApp() {
   const [messages, setMessages] = useState([]);
   const [emergency, setEmergency] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
+
+  // Theme toggle
+  useEffect(() => {
+    const root = document.documentElement;
+    if (isDarkMode) {
+      root.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      root.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  }, [isDarkMode]);
 
   // Re-classify
   const [gesture, setGesture] = useState({ gesture: 'NONE', confidence: 0, label: 'No gesture', isAlphabet: false });
@@ -201,47 +222,80 @@ export default function SunoSignApp() {
       {emergency && <EmergencyOverlay onDismiss={dismissEmergency} />}
       <ProfileModal profile={profile} onSave={saveProfile} open={profileOpen} onClose={() => setProfileOpen(false)} />
 
-      <header className="px-4 sm:px-6 py-3 flex items-center justify-between border-b border-border bg-card/80 backdrop-blur-md sticky top-0 z-40">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
-            <Hand className="w-5 h-5 text-primary-foreground" />
+      <header className="px-4 sm:px-6 py-4 flex items-center justify-between glass-card sticky top-0 z-50 border-b">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center hover-scale soft-glow">
+            <Hand className="w-6 h-6 text-primary-foreground" />
           </div>
           <div className="hidden sm:block">
-            <h1 className="text-lg font-bold text-foreground leading-tight" style={{ fontFamily: 'var(--font-display)' }}>SunoSign AI</h1>
-            <p className="text-[10px] text-muted-foreground">
-              {context === 'retailer' ? `${DOMAINS_MAP[domain]} Mode` : mode === 'alphabet' ? 'A–Z Detection' : mode === 'numbers' ? '1–9 Detection' : 'Phrase Detection'}
+            <h1 className="text-xl font-bold gradient-text leading-tight" style={{ fontFamily: 'var(--font-display)' }}>SunoSign AI</h1>
+            <p className="text-xs text-muted-foreground font-medium">
+              {context === 'retailer' ? `🏪 ${DOMAINS_MAP[domain]}` : mode === 'alphabet' ? '🔤 A–Z Detection' : mode === 'numbers' ? '🔢 1–9 Detection' : '💬 Phrase Detection'}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <div className="flex bg-muted rounded-2xl p-1 gap-0.5">
-            {modes.map(m => (
-              <button
-                key={m.key}
-                onClick={() => setMode(m.key)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-semibold transition-all duration-200 ${
-                  mode === m.key
-                    ? 'bg-primary text-primary-foreground shadow-md'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/80'
-                }`}
-              >
-                {m.icon}
-                <span className="hidden sm:inline">{m.label}</span>
-              </button>
-            ))}
+        <div className="flex items-center gap-3">
+          {/* Separate Toggle Buttons for Each Mode */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setMode('alphabet')}
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-300 smooth-transition flex items-center gap-2 ${
+                mode === 'alphabet'
+                  ? 'bg-gradient-to-r from-primary to-secondary text-primary-foreground shadow-glow-lg scale-105'
+                  : 'glass-card border border-white/10 text-muted-foreground hover:text-foreground hover:border-primary/50'
+              }`}
+              title="A-Z Gesture Detection"
+            >
+              <Hand className="w-4 h-4" />
+              <span className="hidden sm:inline">A–Z</span>
+            </button>
+
+            <button
+              onClick={() => setMode('numbers')}
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-300 smooth-transition flex items-center gap-2 ${
+                mode === 'numbers'
+                  ? 'bg-gradient-to-r from-primary to-secondary text-primary-foreground shadow-glow-lg scale-105'
+                  : 'glass-card border border-white/10 text-muted-foreground hover:text-foreground hover:border-primary/50'
+              }`}
+              title="Number Detection (1-9)"
+            >
+              <Hash className="w-4 h-4" />
+              <span className="hidden sm:inline">1–9</span>
+            </button>
+
+            <button
+              onClick={() => setMode('phrases')}
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-300 smooth-transition flex items-center gap-2 ${
+                mode === 'phrases'
+                  ? 'bg-gradient-to-r from-primary to-secondary text-primary-foreground shadow-glow-lg scale-105'
+                  : 'glass-card border border-white/10 text-muted-foreground hover:text-foreground hover:border-primary/50'
+              }`}
+              title="Two-Hand Phrase Detection"
+            >
+              <MessageSquare className="w-4 h-4" />
+              <span className="hidden sm:inline">Phrases</span>
+            </button>
           </div>
+
+          <div className="hidden md:block h-6 w-px bg-border/30" />
           <ContextSelector context={context} domain={domain} onContextChange={setContext} onDomainChange={setDomain} />
         </div>
 
         <div className="flex items-center gap-2">
           <button onClick={() => setVoiceEnabled(!voiceEnabled)}
-            className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${voiceEnabled ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}>
-            {voiceEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300 smooth-transition hover-scale ${voiceEnabled ? 'bg-gradient-to-br from-primary to-secondary text-primary-foreground shadow-glow' : 'bg-muted/40 text-muted-foreground border border-white/10'}`}
+            title={voiceEnabled ? 'Mute' : 'Unmute'}>
+            {voiceEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
+          </button>
+          <button onClick={() => setIsDarkMode(!isDarkMode)}
+            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-500 smooth-transition hover-scale ${isDarkMode ? 'bg-gradient-to-br from-indigo-500 to-purple-500 text-white shadow-glow' : 'bg-gradient-to-br from-yellow-400 to-orange-400 text-black shadow-glow'}`}
+            title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}>
+            {isDarkMode ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
           </button>
           <button onClick={() => setProfileOpen(true)}
-            className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center hover:bg-muted/80 transition-colors">
-            <User className="w-4 h-4 text-muted-foreground" />
+            className="w-10 h-10 rounded-xl bg-muted/40 flex items-center justify-center hover:bg-muted/60 transition-all duration-300 smooth-transition hover-scale border border-white/10">
+            <User className="w-5 h-5 text-muted-foreground" />
           </button>
         </div>
       </header>
@@ -252,109 +306,166 @@ export default function SunoSignApp() {
         ) : mode === 'phrases' ? (
           <PhraseDetection />
         ) : (
-          <div className="grid lg:grid-cols-[1fr_380px] gap-5">
-            <div className="space-y-4">
-              <div className="bg-card rounded-2xl border border-border overflow-hidden">
-                <div className="relative aspect-video bg-foreground/5">
+          <div className="grid lg:grid-cols-[1fr_380px] gap-6">
+            <div className="space-y-6">
+              {/* Camera Feed Card */}
+              <div className="glass-card rounded-3xl border overflow-hidden">
+                <div className="relative aspect-video bg-gradient-to-br from-primary/5 via-background to-secondary/5 backdrop-blur-sm">
                   <video ref={videoRef} className="w-full h-full object-cover" playsInline muted style={{ transform: 'scaleX(-1)' }} />
                   <canvas ref={canvasRef} width={640} height={480}
                     className="absolute inset-0 w-full h-full pointer-events-none" style={{ transform: 'scaleX(-1)' }} />
                   {!isActive && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 backdrop-blur-sm">
                       {camError ? (
-                        <div className="text-center px-6">
-                          <CameraOff className="w-12 h-12 text-destructive mx-auto mb-3" />
-                          <p className="text-destructive font-medium text-sm">{camError}</p>
+                        <div className="text-center px-6 fade-in">
+                          <CameraOff className="w-16 h-16 text-destructive mx-auto mb-4 animate-pulse" />
+                          <p className="text-destructive font-bold text-base">{camError}</p>
                         </div>
                       ) : (
                         <>
-                          <Camera className="w-12 h-12 text-muted-foreground/40" />
-                          <p className="text-muted-foreground text-sm">Camera is off</p>
+                          <Camera className="w-16 h-16 text-primary/30 animate-fade-in" />
+                          <p className="text-muted-foreground font-medium">Start camera to begin detection</p>
                         </>
                       )}
                     </div>
                   )}
                   {modelLoading && isActive && (
-                    <div className="absolute top-3 left-3 flex items-center gap-2 bg-card/90 backdrop-blur-sm rounded-lg px-3 py-1.5 text-xs font-medium text-foreground">
-                      <Loader2 className="w-3 h-3 animate-spin" /> Loading model...
+                    <div className="absolute top-4 left-4 flex items-center gap-3 glass-card px-4 py-2.5 rounded-xl fade-in">
+                      <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                      <span className="text-xs font-semibold text-foreground">Loading AI Model...</span>
                     </div>
                   )}
                   {isActive && (
-                    <div className="absolute top-3 right-3 flex gap-2">
+                    <div className="absolute top-4 right-4 flex gap-3">
                        {hands && hands.length > 0 && (
-                        <span className="bg-accent/80 backdrop-blur-sm text-accent-foreground rounded-lg px-2.5 py-1 text-xs font-semibold fade-in">
-                          ✋ {hands.length} hand{hands.length > 1 ? 's' : ''}
+                        <span className="animate-scale-in glass-card text-accent-foreground rounded-xl px-3.5 py-2 text-xs font-bold backdrop-blur-xl">
+                          ✋ {hands.length} Hand{hands.length > 1 ? 's' : ''}
                         </span>
                       )}
                       {gesture.gesture !== 'NONE' && (
-                        <div className="bg-primary/90 backdrop-blur-sm text-primary-foreground rounded-lg px-3 py-1 fade-in">
+                        <div className="animate-scale-in glass-card text-primary-foreground rounded-xl px-4 py-2.5 fade-in backdrop-blur-xl border border-primary/30">
                           <p className="text-sm font-bold">{gesture.label}</p>
-                          <p className="text-[9px] opacity-80">{gesture.confidence}%</p>
+                          <p className="text-xs opacity-80">Confidence: {gesture.confidence}%</p>
                         </div>
                       )}
                     </div>
                   )}
                 </div>
-                <div className="p-4 flex items-center justify-between">
-                  <Button onClick={isActive ? stop : start} variant={isActive ? 'destructive' : 'default'} className="rounded-xl h-11 px-6 font-semibold">
-                    {isActive ? <><CameraOff className="w-4 h-4 mr-2" /> Stop Camera</> : <><Camera className="w-4 h-4 mr-2" /> Start Camera</>}
+                <div className="p-5 flex items-center gap-3">
+                  <Button onClick={isActive ? stop : start} className={`rounded-xl h-12 px-6 font-bold text-base transition-all duration-300 hover-scale ${
+                    isActive 
+                      ? 'bg-gradient-to-r from-destructive to-red-600 text-white shadow-glow-lg' 
+                      : 'bg-gradient-to-r from-primary to-secondary text-white shadow-glow-lg'
+                  }`}>
+                    {isActive ? <><CameraOff className="w-5 h-5 mr-2" /> Stop Camera</> : <><Camera className="w-5 h-5 mr-2" /> Start Camera</>}
+                  </Button>
+                  <div className="text-xs text-muted-foreground ml-auto font-medium">
+                    {isActive ? '🟢 Live' : '⚪ Ready'}
+                  </div>
+                </div>
+              </div>
+              {/* Detected Letter & Suggestions */}
+              {stableLetter && (
+                <div className="glass-card rounded-3xl p-6 border space-y-5 animate-scale-in">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">Detected Letter</p>
+                      <p className="text-6xl font-black gradient-text">{stableLetter}</p>
+                    </div>
+                    <Button size="lg" onClick={() => addLetterToWord(stableLetter)} className="rounded-2xl bg-gradient-to-r from-primary to-secondary text-white hover-scale shadow-glow-lg">
+                      <Sparkles className="w-5 h-5 mr-2" /> Add
+                    </Button>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-muted-foreground font-semibold">Confidence</span>
+                      <span className="text-sm font-bold text-primary">{stableConfidence}%</span>
+                    </div>
+                    <Progress value={stableConfidence} className="h-2 rounded-full" />
+                  </div>
+                </div>
+              )}
+
+              {/* Suggestions based on context and domain */}
+              {stableLetter && (context === 'retailer' ? domainPhrases.length > 0 : domainWords.length > 0) && (
+                <div className="glass-card rounded-3xl p-6 border space-y-4 animate-slide-down">
+                  <div>
+                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-4">💡 Smart Suggestions</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {(context === 'retailer' ? domainPhrases : domainWords).slice(0, 4).map((word, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => {
+                            setCurrentWord(word);
+                            addMessage('user', `Selected: ${word}`);
+                          }}
+                          className="group glass-card rounded-2xl p-3 border border-primary/20 hover:border-primary/50 text-center transition-all duration-300 hover-scale hover:shadow-glow"
+                        >
+                          <p className="text-sm font-bold text-foreground group-hover:text-primary transition-colors">{word}</p>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Word Builder */}
+              <div className="glass-card rounded-3xl p-6 border space-y-4">
+                <div className="space-y-3">
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Built Word</p>
+                  <div className="relative group">
+                    <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 to-secondary/20 rounded-2xl blur-lg opacity-0 group-hover:opacity-100 transition duration-300" />
+                    <div className="relative flex items-center min-h-[56px] bg-gradient-to-r from-primary/5 to-secondary/5 rounded-2xl px-4 py-3 border border-primary/20">
+                      <span className="text-2xl font-bold tracking-wider text-foreground">
+                        {currentWord || <span className="text-sm font-normal text-muted-foreground tracking-normal">Make hand gestures...</span>}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2 pt-2">
+                  <Button size="sm" onClick={deleteLastLetter} disabled={!currentWord} className="rounded-xl h-10 gap-1.5 glass-card border hover:border-destructive/50 hover:text-destructive">
+                    <Delete className="w-4 h-4" /> Delete
+                  </Button>
+                  <Button size="sm" onClick={addSpace} disabled={!currentWord} className="rounded-xl h-10 glass-card border hover:border-primary/50">
+                    ⎵ Space
+                  </Button>
+                  <Button size="sm" onClick={speakAll} disabled={!currentWord && completedWords.length === 0} className="rounded-xl h-10 gap-1.5 ml-auto bg-gradient-to-r from-primary to-secondary text-white hover-scale shadow-glow">
+                    <Volume2 className="w-4 h-4" /> Speak
+                  </Button>
+                  <Button size="sm" onClick={clearAll} className="rounded-xl h-10 glass-card border hover:border-primary/50">
+                    <RotateCcw className="w-4 h-4" />
                   </Button>
                 </div>
               </div>
 
-              <div className="space-y-4">
-                {stableLetter && (
-                  <div className="bg-card rounded-2xl border border-border overflow-hidden">
-                    <div className="px-4 py-3 bg-primary/10 border-b border-primary/20">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-semibold text-primary uppercase tracking-wider">Detected Letter</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-3xl font-bold text-primary">{stableLetter}</span>
-                          <Button size="sm" variant="outline" className="h-7 text-xs rounded-lg" onClick={() => addLetterToWord(stableLetter)}>
-                            + Add
-                          </Button>
-                        </div>
-                      </div>
-                      <Progress value={stableConfidence} className="h-1.5" />
-                    </div>
-                  </div>
-                )}
-
-                <div className="bg-card rounded-2xl border border-border overflow-hidden p-4 space-y-3">
-                  <div className="flex items-center gap-2 min-h-[48px] bg-muted/50 rounded-xl px-4 py-2">
-                    <span className="text-lg font-bold tracking-[0.2em] text-foreground">
-                      {currentWord || <span className="text-muted-foreground text-sm font-normal tracking-normal">Sign letters to build words...</span>}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-2 pt-1">
-                    <Button size="sm" variant="outline" className="rounded-xl h-9 gap-1.5" onClick={deleteLastLetter} disabled={!currentWord}>
-                      <Delete className="w-3.5 h-3.5" /> Delete
-                    </Button>
-                    <Button size="sm" variant="outline" className="rounded-xl h-9 gap-1.5" onClick={addSpace} disabled={!currentWord}>
-                      Space
-                    </Button>
-                    <Button size="sm" variant="default" className="rounded-xl h-9 gap-1.5 ml-auto" onClick={speakAll} disabled={!currentWord && completedWords.length === 0}>
-                      <Volume2 className="w-3.5 h-3.5" /> Speak
-                    </Button>
-                    <Button size="sm" variant="ghost" className="rounded-xl h-9 gap-1.5" onClick={clearAll}>
-                      <RotateCcw className="w-3.5 h-3.5" />
-                    </Button>
+              {/* Completed Words History */}
+              {completedWords.length > 0 && (
+                <div className="glass-card rounded-3xl p-6 border space-y-3 animate-scale-in">
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Message</p>
+                  <div className="flex flex-wrap gap-2">
+                    {completedWords.map((word, idx) => (
+                      <span key={idx} className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-gradient-to-r from-primary/20 to-secondary/20 border border-primary/30 text-sm font-semibold text-foreground hover:border-primary/60 transition-all duration-300">
+                        {word}
+                        <button onClick={() => setCompletedWords(completedWords.filter((_, i) => i !== idx))} className="hover:text-destructive">×</button>
+                      </span>
+                    ))}
                   </div>
                 </div>
-              </div>
+              )}
             </div>
 
-            <div className="lg:h-[calc(100vh-120px)] lg:sticky lg:top-[72px] h-[400px]">
+            {/* Right Sidebar - Chat */}
+            <div className="lg:h-[calc(100vh-120px)] lg:sticky lg:top-[80px] h-[400px]">
               <ChatPanel messages={messages} />
             </div>
           </div>
         )}
       </main>
 
-      <footer className="px-4 py-3 border-t border-border text-center">
-        <p className="text-[11px] text-muted-foreground">
-          {mode === 'phrases' ? 'Phrase detection active' : 'Sign letters to build words'}
+      <footer className="px-6 py-4 border-t border-border/50 text-center glass-card mt-auto">
+        <p className="text-xs text-muted-foreground font-semibold tracking-wide">
+          {mode === 'phrases' ? '📹 Phrase Detection • Real-time Gesture Recognition' : '🔤 Sign Letters • Build Words & Communicate'}
         </p>
       </footer>
     </div>

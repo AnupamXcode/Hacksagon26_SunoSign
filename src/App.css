@@ -1,42 +1,64 @@
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+/* App-specific styles */
+
+/* Smooth font rendering */
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+/* Smooth scrolling for the entire app */
+html, body, #root {
+  scroll-behavior: smooth;
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
+/* Custom scrollbar for better UX */
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Hero section animations */
+@keyframes shimmerEffect {
+  0% {
+    background-position: -1000px 0;
   }
-  to {
-    transform: rotate(360deg);
+  100% {
+    background-position: 1000px 0;
   }
 }
 
+/* Ultra-smooth transitions */
+button, a, [role="button"] {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Focus ring for accessibility */
+:focus-visible {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 2px;
+}
+
+/* Smooth page transitions */
 @media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
+  html {
+    scroll-behavior: smooth;
   }
 }
 
-.card {
-  padding: 2em;
+/* Glassmorphism backdrop filter support check */
+@supports (backdrop-filter: blur(1px)) {
+  .glass-card {
+    backdrop-filter: blur(8px) saturate(180%);
+  }
 }
 
-.read-the-docs {
-  color: #888;
+/* Fallback for browsers without backdrop-filter */
+@supports not (backdrop-filter: blur(1px)) {
+  .glass-card {
+    background-color: rgba(255, 255, 255, 0.8);
+  }
+  
+  .dark .glass-card {
+    background-color: rgba(20, 20, 20, 0.8);
+  }
 }
+

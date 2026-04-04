@@ -24,7 +24,7 @@ const GESTURE_GUIDE = [
 export function NumberDetection() {
   const { videoRef, isActive, error: camError, start, stop } = useCamera();
   const canvasRef = useRef(null);
-  const { gesture, loading: modelLoading, landmarks } = useHandDetectionWithLandmarks(videoRef, canvasRef, isActive);
+  const { hands, loading: modelLoading, landmarks } = useHandDetectionWithLandmarks(videoRef, canvasRef, isActive);
   const { result, history, clearHistory } = useNumberDetection(landmarks, isActive);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [showGuide, setShowGuide] = useState(false);
@@ -56,97 +56,125 @@ export function NumberDetection() {
   return (
     <div className="space-y-4">
       <div className="grid lg:grid-cols-[1fr_340px] gap-4">
-        <div className="space-y-4">
-          <div className="bg-card rounded-2xl border border-border overflow-hidden">
-            <div className="relative aspect-video bg-foreground/5">
+        <div className="space-y-6">
+          {/* Camera Feed */}
+          <div className="glass-card rounded-3xl border overflow-hidden">
+            <div className="relative aspect-video bg-gradient-to-br from-primary/5 via-background to-secondary/5 backdrop-blur-sm">
               <video ref={videoRef} className="w-full h-full object-cover" playsInline muted style={{ transform: 'scaleX(-1)' }} />
               <canvas ref={canvasRef} width={640} height={480} className="absolute inset-0 w-full h-full pointer-events-none" style={{ transform: 'scaleX(-1)' }} />
               {!isActive && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 backdrop-blur-sm">
                   {camError ? (
-                    <div className="text-center px-6">
-                      <CameraOff className="w-12 h-12 text-destructive mx-auto mb-3" />
-                      <p className="text-destructive font-medium text-sm">{camError}</p>
+                    <div className="text-center px-6 fade-in">
+                      <CameraOff className="w-16 h-16 text-destructive mx-auto mb-4 animate-pulse" />
+                      <p className="text-destructive font-bold text-base">{camError}</p>
                     </div>
                   ) : (
                     <>
-                      <Hash className="w-12 h-12 text-muted-foreground/40" />
-                      <p className="text-muted-foreground text-sm">Start camera to detect number signs</p>
+                      <Hash className="w-16 h-16 text-primary/30 animate-float" />
+                      <p className="text-muted-foreground font-medium">Start camera to detect hand numbers</p>
                     </>
                   )}
                 </div>
               )}
               {modelLoading && isActive && (
-                <div className="absolute top-3 left-3 flex items-center gap-2 bg-card/90 backdrop-blur-sm rounded-lg px-3 py-1.5 text-xs font-medium text-foreground">
-                  <Loader2 className="w-3 h-3 animate-spin" /> Loading model...
+                <div className="absolute top-4 left-4 flex items-center gap-3 glass-card px-4 py-2.5 rounded-xl fade-in">
+                  <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                  <span className="text-xs font-semibold text-foreground">Loading AI Model...</span>
                 </div>
               )}
               {isActive && (
-                <div className={`absolute top-3 right-3 rounded-lg px-3 py-1.5 text-xs font-semibold backdrop-blur-sm fade-in ${
-                  gesture.gesture !== 'NONE' ? 'bg-accent/90 text-accent-foreground' : 'bg-muted/80 text-muted-foreground'
-                }`}>
-                  {gesture.gesture !== 'NONE' ? '✋ Hand Detected' : 'No Hand Found'}
+                <div className="absolute top-4 right-4 flex gap-3">
+                  {hands && hands.length > 0 && (
+                    <span className="animate-scale-in glass-card text-accent-foreground rounded-xl px-3.5 py-2 text-xs font-bold backdrop-blur-xl">
+                      ✋ Hand Detected
+                    </span>
+                  )}
                 </div>
               )}
               {isActive && result.number !== null && result.isStable && (
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 gesture-pulse bg-primary/90 backdrop-blur-sm text-primary-foreground rounded-2xl px-8 py-4 text-center fade-in">
-                  <p className="text-5xl font-black" style={{ fontFamily: 'var(--font-mono)' }}>{result.number}</p>
+                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 animate-scale-in">
+                  <div className="px-8 py-6 rounded-3xl bg-gradient-to-br from-primary to-secondary text-white text-center shadow-glow-lg">
+                    <p className="text-6xl font-black" style={{ fontFamily: 'var(--font-mono)' }}>{result.number}</p>
+                    <p className="text-xs font-semibold mt-2 opacity-90">Number Detected</p>
+                  </div>
                 </div>
               )}
             </div>
-            <div className="p-4 flex items-center gap-2 flex-wrap">
-              <Button onClick={isActive ? stop : start} variant={isActive ? 'destructive' : 'default'} className="rounded-xl h-11 px-5 font-semibold">
-                {isActive ? <><CameraOff className="w-4 h-4 mr-2" /> Stop</> : <><Camera className="w-4 h-4 mr-2" /> Start</>}
+            <div className="p-5 flex items-center gap-3">
+              <Button onClick={isActive ? stop : start} className={`rounded-xl h-12 px-6 font-bold text-base transition-all duration-300 hover-scale ${
+                isActive 
+                  ? 'bg-gradient-to-r from-destructive to-red-600 text-white shadow-glow-lg' 
+                  : 'bg-gradient-to-r from-primary to-secondary text-white shadow-glow-lg'
+              }`}>
+                {isActive ? <><CameraOff className="w-5 h-5 mr-2" /> Stop</> : <><Camera className="w-5 h-5 mr-2" /> Start</>}
               </Button>
-              <Button variant="outline" className="rounded-xl h-11" onClick={speakCurrent} disabled={result.number === null}>
-                <Volume2 className="w-4 h-4 mr-2" /> Speak
+              <Button variant="outline" className="rounded-xl h-12 px-4 gap-2 glass-card border-white/20 hover:border-primary/50" onClick={speakCurrent} disabled={result.number === null}>
+                <Volume2 className="w-5 h-5" />
               </Button>
-              <Button variant="ghost" className="rounded-xl h-11 ml-auto" onClick={() => setShowGuide(g => !g)}>
-                <Hand className="w-4 h-4 mr-2" /> Guide
+              <Button variant="ghost" className="rounded-xl h-12 ml-auto glass-card hover:border-white/20" onClick={() => setShowGuide(g => !g)}>
+                <Hand className="w-5 h-5 mr-2" /> Guide
               </Button>
             </div>
           </div>
           {showGuide && (
-            <div className="bg-card rounded-2xl border border-border p-4 slide-up">
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+            <div className="glass-card rounded-3xl border p-6 animate-slide-down">
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-5">📚 Hand Gesture Guide</p>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                 {GESTURE_GUIDE.map(g => (
-                  <div key={g.number} className="bg-muted/50 rounded-xl p-3 text-center">
-                    <div className="text-2xl mb-1">{g.fingers}</div>
-                    <div className="text-lg font-bold text-foreground" style={{ fontFamily: 'var(--font-mono)' }}>{g.number}</div>
-                  </div>
+                  <button 
+                    key={g.number} 
+                    className="glass-card rounded-2xl p-4 text-center hover:border-primary/50 transition-all duration-300 hover-scale border"
+                  >
+                    <div className="text-3xl mb-2">{g.fingers}</div>
+                    <div className="text-xl font-black text-primary" style={{ fontFamily: 'var(--font-mono)' }}>{g.number}</div>
+                    <p className="text-xs text-muted-foreground mt-2 leading-tight">{g.description}</p>
+                  </button>
                 ))}
               </div>
             </div>
           )}
         </div>
-        <div className="space-y-4">
-          <div className="bg-card rounded-2xl border border-border p-5">
-            <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-4">Detection Output</h3>
-            <div className="text-center mb-4">
-              <div className={`inline-flex items-center justify-center w-24 h-24 rounded-2xl text-5xl font-black transition-all duration-300 ${
+
+        {/* Right Sidebar */}
+        <div className="space-y-6">
+          {/* Detection Output */}
+          <div className="glass-card rounded-3xl border p-6">
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-4">📊 Detection Output</p>
+            <div className="text-center mb-6">
+              <div className={`inline-flex items-center justify-center w-28 h-28 rounded-3xl text-6xl font-black transition-all duration-300 ${
                 result.number !== null && result.isStable
-                  ? 'bg-primary/15 text-primary gesture-pulse'
-                  : 'bg-muted/50 text-muted-foreground/30'
+                  ? 'bg-gradient-to-br from-primary/30 to-secondary/30 text-primary soft-glow'
+                  : 'bg-muted/20 text-muted-foreground/30'
               }`} style={{ fontFamily: 'var(--font-mono)' }}>
                 {result.number !== null ? result.number : '?'}
               </div>
             </div>
-            <div className="space-y-1.5 mb-4">
-              <Progress value={result.confidence} className="h-2" />
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-muted-foreground font-semibold">Confidence</span>
+                <span className="text-sm font-bold text-primary">{result.confidence}%</span>
+              </div>
+              <Progress value={result.confidence} className="h-2 rounded-full" />
             </div>
           </div>
-          <div className="bg-card rounded-2xl border border-border p-4">
-             <div className="flex items-center justify-between mb-3">
-               <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">History</h3>
+
+          {/* History */}
+          <div className="glass-card rounded-3xl border p-6">
+             <div className="flex items-center justify-between mb-4">
+               <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">🕐 Detection History</p>
                {history.length > 0 && (
-                 <Button variant="ghost" size="sm" className="h-6 text-xs rounded-lg" onClick={clearHistory}>
-                   <Trash2 className="w-3 h-3 mr-1" /> Clear
+                 <Button variant="ghost" size="sm" className="h-8 text-xs rounded-lg hover:bg-destructive/20 hover:text-destructive" onClick={clearHistory}>
+                   <Trash2 className="w-3.5 h-3.5 mr-1" /> Clear
                  </Button>
                )}
              </div>
+             {history.length === 0 && (
+               <p className="text-xs text-muted-foreground text-center py-4">No history yet...</p>
+             )}
              <div className="flex flex-wrap gap-2">
                {history.map((h, i) => (
-                 <div key={i} className="bg-primary/10 text-primary rounded-xl px-3 py-1.5 text-sm font-bold fade-in">
+                 <div key={i} className="bg-gradient-to-br from-primary/20 to-secondary/20 text-primary rounded-2xl px-4 py-2 text-lg font-bold fade-in border border-primary/30 hover:border-primary/60 transition-all duration-300">
                    {h.number}
                  </div>
                ))}
