@@ -511,15 +511,4 @@ Part of Hacksagon26 Hackathon submission
 
 ---
 
-## 📞 Support
 
-- **Bugs**: Open GitHub Issue
-- **Questions**: Check existing issues
-- **Features**: Create Discussion
-- **Contact**: GitHub [@AnupamXcode](https://github.com/AnupamXcode)
-
----
-
-**Made with ❤️ for Accessible Communication** 🚀
-
-Version: 1.0.0 | Last Updated: 2024
