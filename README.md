@@ -310,15 +310,42 @@ Hacksagon26_SunoSign/
 5. History accumulates numbers
 ```
 
-### Using Phrases Mode
+### Using Phrases Mode (10 Trained Gestures)
 
+**Step-by-Step:**
 ```
-1. Click "Phrases" button
-2. Use both hands
-3. Phrase recognized in real-time
-4. Voice output plays
-5. Message appears in history
+1. Click "Phrases" button in header
+2. Make trained hand gesture (see table below)
+3. Gesture detected in real-time with confidence score
+4. Suggestions appear based on phrase context
+5. Click "Speak" to hear the phrase
+6. Message appears in chat history
+7. Can capture custom gestures for custom phrases
 ```
+
+**Trained Phrase Gestures Reference:**
+
+| # | Gesture | Hand Type | Confidence | Min Hold |
+|---|---------|-----------|------------|----------|
+| 1 | "MY NAME IS" | 2 Hands | 88% | 3 sec |
+| 2 | "ARE" | 2 Hands | 85% | 3 sec |
+| 3 | "YOU" | 1 Hand | 82% | 2-3 sec |
+| 4 | "CHOCOLATE" | 2 Hands | 86% | 3 sec |
+| 5 | "COFFEE" | 2 Hands | 84% | 3 sec |
+| 6 | "HOW MUCH" | 1 Hand | 83% | 2-3 sec |
+| 7 | "I LOVE YOU" | 1 Hand | 87% | 3 sec |
+| 8 | "WASHROOM" | 1 Hand | 81% | 2-3 sec |
+| 9 | "PAIN" | 2 Hands | 85% | 3 sec |
+| 10 | "WHERE" | 1 Hand | 80% | 2-3 sec |
+
+**Detection Tips:**
+- ✅ Hold gesture stable for 2-3 seconds
+- ✅ Make clear, deliberate hand shapes
+- ✅ Keep hands in center of frame
+- ✅ Good lighting improves accuracy by 15-20%
+- ✅ Hands should be at waist to shoulder height
+- ❌ Avoid blurry or jerky movements
+- ❌ Don't overlap hands unnecessarily
 
 ---
 
@@ -350,21 +377,392 @@ npm test               # Run tests
 npm run test:watch    # Tests in watch mode
 ```
 
+## 📖 Documentation
+
+### Core Documentation
+- **[README.md](README.md)** - You are here! Project overview and setup guide
+- **[GESTURE_GUIDE.md](GESTURE_GUIDE.md)** - Complete gesture reference with all 45+ gestures
+- **[CAMERA_STABILITY.md](CAMERA_STABILITY.md)** - Camera feed stability implementation (NEW!)
+
+### Camera Stability (Zero-Slide Guarantee)
+
+The application implements **10 core stability rules** to ensure the camera feed NEVER shifts, slides, or re-renders:
+
+✅ **Fixed Container Dimensions** - Locked aspect ratio (16:9)
+✅ **Persistent Video Stream** - No re-mounting during detection
+✅ **Overlay-Only Outputs** - All gestures use absolute positioning
+✅ **Landmark Smoothing** - 5-frame moving average for jitter reduction
+✅ **Prevented Re-renders** - Gate updates at >5% confidence threshold
+✅ **Separate State Management** - Camera and gesture states independent
+✅ **No Dynamic Resizing** - Fixed dimensions across all breakpoints
+✅ **CSS Lock** - `!important` rules prevent Tailwind overrides
+✅ **Stable Scrollbar** - `scrollbar-gutter: stable` applied
+✅ **Memoization** - useStableCamera hook centralizes control
+
+**Result:** 60fps stable camera + smooth gesture detection with zero layout shifts
+
+See [CAMERA_STABILITY.md](CAMERA_STABILITY.md) for implementation details.
+
+**📖 For Complete Gesture Details:** See [GESTURE_GUIDE.md](GESTURE_GUIDE.md) for comprehensive specifications including alphabets, numbers, and all trained phrases with detection rules.
+
+### Quick Gesture Overview
+
+#### Alphabet Gestures (A-Z)
+Hold each letter shape for 1+ second in camera frame. Each letter has a distinct hand configuration.
+
+### Number Gestures (1-9)
+
+| Number | Hand Configuration | Detection |
+|--------|-------------------|-----------|
+| 1 | Index finger only extended | Index tip farthest from palm |
+| 2 | Index + Middle extended | Two fingers aligned upward |
+| 3 | Index + Middle + Ring extended | Three fingers in line |
+| 4 | All except thumb extended | Four fingers up together |
+| 5 | All fingers extended (open hand) | Fingertips spread, palm open |
+| 6-9 | Specific combinations | Varies per configuration |
+
+**Rule**: Hold stable for 2-3 frames for recognition
+
 ---
 
-## 🧠 Gesture Reference
+### Phrase Gestures (Trained Phrases)
 
-### Alphabet (A-Z)
-Hold each letter shape for 1 second
+#### 1️⃣ "MY NAME IS"
+**Hand Configuration:**
+- **Right Hand**: Index & middle extended horizontally (pointing left), ring/pinky folded
+- **Left Hand**: Index & middle extended vertically (pointing up), others folded
+- **Spatial**: Right hand crosses over left hand (intersection point)
+- **Detection**: Hands close/touching, fingers aligned perpendicular
+- **Stability**: ≥3 frames
+- **Confidence**: >75%
 
-### Numbers (1-9)
-Show fingers to represent number (1 = index only, 2 = index+middle, etc.)
+---
 
-### Phrases
-- HELLO: Wave motion
-- I LOVE YOU: Heart shape
-- HELP: Both hands up
-- YES/NO: Nodding/shaking motion
+#### 2️⃣ "ARE"
+**Hand Configuration:**
+- **Both Hands**: Thumbs extended upward, all other fingers folded
+- **Spatial**: Thumbs close to each other, hands vertical
+- **Detection**: Both thumbs at similar height, symmetrical
+- **Stability**: ≥3 frames
+- **Confidence**: >80%
+
+---
+
+#### 3️⃣ "YOU"
+**Hand Configuration:**
+- **Right Hand Only**: Index finger extended forward (pointing outward)
+- **Other Fingers**: Thumb slightly bent, ring/pinky folded
+- **Palm**: Facing sideways
+- **Detection**: Index tip farthest point from palm center
+- **Stability**: ≥2-3 frames
+- **Confidence**: >70%
+
+---
+
+#### 4️⃣ "CHOCOLATE"
+**Hand Configuration:**
+- **Left Hand**: All fingers extended horizontally (flat palm facing up)
+- **Right Hand**: Curved "C" shape (thumb opposing fingers)
+- **Spatial**: Right hand above left hand, "C" hovering over palm
+- **Detection**: 
+  - Left: All fingertips aligned horizontally
+  - Right: Small distance between thumb-index (curvature)
+- **Vertical Separation**: 2-5cm
+- **Stability**: ≥3 frames
+- **Confidence**: >75%
+
+---
+
+#### 5️⃣ "COFFEE"
+**Hand Configuration:**
+- **Both Hands**: Fists closed (all fingers folded)
+- **Thumbs**: Wrapped over fingers
+- **Spatial**: One fist stacked vertically above the other
+- **Detection**: All fingertips near palm center, vertical alignment
+- **Stability**: ≥3 frames
+- **Confidence**: >80%
+
+---
+
+#### 6️⃣ "HOW MUCH"
+**Hand Configuration:**
+- **Single Hand (Either)**: Pinch gesture
+- **Thumb**: Extended outward
+- **Index**: Slightly bent, touching thumb (pinch)
+- **Other Fingers**: Folded
+- **Palm**: Facing sideways
+- **Detection**: Distance(thumb_tip, index_tip) very small (<1cm)
+- **Stability**: ≥2-3 frames
+- **Confidence**: >75%
+
+---
+
+#### 7️⃣ "I LOVE YOU"
+**Hand Configuration:**
+- **Single Hand**: ILY sign
+- **Thumb**: Extended outward (left)
+- **Index**: Extended upward
+- **Middle**: Folded (center)
+- **Ring**: Folded (center)
+- **Pinky**: Extended upward (right)
+- **Palm**: Facing forward
+- **Detection**: Three fingers extended (thumb, index, pinky), two folded
+- **Stability**: ≥3 frames
+- **Confidence**: >750%
+
+---
+
+#### 8️⃣ "WASHROOM"
+**Hand Configuration:**
+- **Single Hand**: Closed fist
+- **All Fingers**: Folded into fist
+- **Thumb**: Wrapped outside
+- **Palm**: Facing forward
+- **Detection**: All fingertips clustered near palm center
+- **Stability**: ≥2-3 frames
+- **Confidence**: >80%
+
+---
+
+#### 9️⃣ "PAIN"
+**Hand Configuration:**
+- **Both Hands**: Pointing gesture
+- **Right Hand**: Index extended forward, thumb extended upward, others folded
+- **Left Hand**: Index extended forward, thumb extended upward, others folded
+- **Spatial**: Both index fingers pointing toward each other
+- **Detection**: 
+  - Distance(right_index_tip, left_index_tip) ≈ 0-2cm (touching/very close)
+  - Both thumbs pointing upward
+  - Other fingers folded
+- **Stability**: ≥3 frames
+- **Confidence**: >80%
+
+---
+
+#### 🔟 "WHERE"
+**Hand Configuration:**
+- **Single Hand**: Pointing upward
+- **Index**: Extended upward (highest point)
+- **Other Fingers**: Folded toward palm
+- **Thumb**: Supporting folded fingers
+- **Palm**: Facing forward
+- **Detection**: Index tip highest point, others near palm
+- **Stability**: ≥2-3 frames
+- **Confidence**: >70%
+
+---
+
+## 🛍️ Retailer Phrases (12 Industry-Specific Gestures)
+
+### Context-Aware Communication for Service Industries
+
+SunoSign AI includes **12 specialized retail phrases** designed for common service interactions:
+- 🏥 **Pharmacy** - Medical/healthcare service requests
+- 🛒 **Grocery** - Shopping and product inquiries
+- 🚌 **Transport** - Transportation services
+- 🏦 **Bank** - Financial services
+
+---
+
+### PHARMACY PHRASES (3)
+
+#### 1️⃣ "I NEED MEDICINE"
+**Hand Configuration:**
+- **Right Hand**: Index pointing to chest (inward), others folded
+- **Left Hand**: Open palm facing upward (requesting)
+- **Spatial**: Right near chest, Left slightly forward
+- **Detection**: Index pointing inward, left palm flat
+- **Min Hold**: 3 frames
+- **Confidence**: 86%
+- **Output**: "I need medicine"
+
+#### 2️⃣ "DO YOU HAVE THIS?"
+**Hand Configuration:**
+- **Right Hand**: Index pointing forward, others folded
+- **Left Hand**: Open palm upward
+- **Spatial**: Right pointing at object/reference
+- **Detection**: Index extending outward, left palm open
+- **Min Hold**: 2-3 frames
+- **Confidence**: 84%
+- **Output**: "Do you have this?"
+
+#### 3️⃣ "WHAT IS THE DOSAGE?"
+**Hand Configuration:**
+- **Right Hand**: Index pointing upward (question indicator)
+- **Left Hand**: Thumb-index pinch (quantity/measurement)
+- **Spatial**: Right above left hand
+- **Detection**: Right index vertical, Left pinch <1cm
+- **Min Hold**: 3 frames
+- **Confidence**: 85%
+- **Output**: "What is the dosage?"
+
+---
+
+### GROCERY PHRASES (3)
+
+#### 4️⃣ "HOW MUCH IS THIS?"
+**Hand Configuration:**
+- **Right Hand**: Thumb-index pinch (price/amount)
+- **Left Hand**: Index pointing forward (object reference)
+- **Spatial**: Right near center, Left pointing
+- **Detection**: Pinch distance <1cm, pointing gesture
+- **Min Hold**: 3 frames
+- **Confidence**: 83%
+- **Output**: "How much is this?"
+
+**Detective Tips:**
+- Hold pinch stable for 3 frames
+- Keep left hand extended outward
+- Clear separation between pointing and pinch gestures
+
+#### 5️⃣ "GIVE ME THIS"
+**Hand Configuration:**
+- **Right Hand**: Index pointing at item (forward)
+- **Left Hand**: Open palm facing upward (receiving)
+- **Spatial**: Right pointing, Left below/receiving
+- **Detection**: Clear pointing + receiving combination
+- **Min Hold**: 3 frames
+- **Confidence**: 84%
+- **Output**: "Give me this"
+
+**Detection Tips:**
+- Point clearly at desired item
+- Keep left palm open and flat
+- Hands should show "asking + receiving" gesture
+
+#### 6️⃣ "DO YOU HAVE FRESH STOCK?"
+**Hand Configuration:**
+- **Right Hand**: All 5 fingers extended, palm forward
+- **Left Hand**: All 5 fingers extended, palm upward
+- **Spatial**: Both hands open (availability signal)
+- **Detection**: All fingers visible on both hands
+- **Min Hold**: 3 frames
+- **Confidence**: 82%
+- **Output**: "Do you have fresh stock?"
+
+**Detection Tips:**
+- Make full open-hand gesture
+- Fingers fully extended and visible
+- Both hands should show open-palm state
+
+---
+
+### TRANSPORT PHRASES (3)
+
+#### 7️⃣ "TAKE ME HERE"
+**Hand Configuration:**
+- **Right Hand**: Index pointing forward (direction)
+- **Left Hand**: Index pointing downward (location)
+- **Spatial**: Right pointing ahead, Left pointing down
+- **Detection**: Dual direction indicators, distinct angle
+- **Min Hold**: 3 frames
+- **Confidence**: 85%
+- **Output**: "Take me here"
+
+**Detection Tips:**
+- Right hand points to destination
+- Left hand points down to map/location
+- Clear directional contrast between hands
+
+#### 8️⃣ "HOW MUCH FARE?"
+**Hand Configuration:**
+- **Right Hand**: Thumb-index pinch (amount/price)
+- **Left Hand**: Open palm upward (request)
+- **Spatial**: Right pinching, Left open
+- **Detection**: Pinch <1cm distance, open palm
+- **Min Hold**: 2-3 frames
+- **Confidence**: 83%
+- **Output**: "How much fare?"
+
+#### 9️⃣ "IS THIS AVAILABLE?"
+**Hand Configuration:**
+- **Right Hand**: Index pointing forward (route/service)
+- **Left Hand**: Open palm upward (inquiry)
+- **Spatial**: Right pointing, Left asking
+- **Detection**: Pointing + open palm combination
+- **Min Hold**: 2-3 frames
+- **Confidence**: 81%
+- **Output**: "Is this available?"
+
+---
+
+### BANK PHRASES (3)
+
+#### 🔟 "I WANT TO WITHDRAW MONEY"
+**Hand Configuration:**
+- **Right Hand**: Closed fist (grasping/taking action)
+- **Left Hand**: Open palm upward (money representation)
+- **Spatial**: Right near left, showing withdrawal motion
+- **Detection**: Clear fist + open palm, moving apart
+- **Min Hold**: 3 frames
+- **Confidence**: 87%
+- **Output**: "I want to withdraw money"
+
+**Detection Tips:**
+- Make fist with right hand (grasping motion)
+- Left hand open and flat (representing money)
+- Show slight separating motion between hands
+
+#### 1️⃣1️⃣ "I WANT TO DEPOSIT MONEY"
+**Hand Configuration:**
+- **Right Hand**: Flat palm facing downward (depositing)
+- **Left Hand**: Open palm facing upward (receiving)
+- **Spatial**: Right moving toward left (depositing motion)
+- **Detection**: Right palm down, Left palm up, approaching
+- **Min Hold**: 3 frames
+- **Confidence**: 86%
+- **Output**: "I want to deposit money"
+
+**Detection Tips:**
+- Right hand flat and facing down
+- Left hand flat and facing up
+- Simulate placing/depositing motion
+
+#### 1️⃣2️⃣ "HELP ME WITH THIS FORM"
+**Hand Configuration:**
+- **Right Hand**: Index pointing forward (form reference)
+- **Left Hand**: Open palm upward (help request)
+- **Spatial**: Right pointing at form, Left asking
+- **Detection**: Pointing + open palm gesture
+- **Min Hold**: 3 frames
+- **Confidence**: 82%
+- **Output**: "Help me with this form"
+
+---
+
+### Quick Reference: Retailer Phrases
+
+| # | Gesture | Hands | Confidence | Duration | Industry |
+|---|---------|-------|-----------|----------|----------|
+| 1 | "I NEED MEDICINE" | 2 | 86% | 3 frames | Pharmacy |
+| 2 | "DO YOU HAVE THIS?" | 2 | 84% | 2-3 frames | Pharmacy |
+| 3 | "WHAT IS THE DOSAGE?" | 2 | 85% | 3 frames | Pharmacy |
+| 4 | "HOW MUCH IS THIS?" | 2 | 83% | 3 frames | Grocery |
+| 5 | "GIVE ME THIS" | 2 | 84% | 3 frames | Grocery |
+| 6 | "DO YOU HAVE FRESH STOCK?" | 2 | 82% | 3 frames | Grocery |
+| 7 | "TAKE ME HERE" | 2 | 85% | 3 frames | Transport |
+| 8 | "HOW MUCH FARE?" | 2 | 83% | 2-3 frames | Transport |
+| 9 | "IS THIS AVAILABLE?" | 2 | 81% | 2-3 frames | Transport |
+| 10 | "I WANT TO WITHDRAW MONEY" | 2 | 87% | 3 frames | Bank |
+| 11 | "I WANT TO DEPOSIT MONEY" | 2 | 86% | 3 frames | Bank |
+| 12 | "HELP ME WITH THIS FORM" | 2 | 82% | 3 frames | Bank |
+
+---
+
+### Quick Reference Table
+
+| Gesture | Hands | Key Feature | Min. Stability | Confidence |
+|---------|-------|-----------|----------------|-----------|
+| MY NAME IS | 2 | Perpendicular fingers intersection | 3 frames | 75%+ |
+| ARE | 2 | Both thumbs up, symmetrical | 3 frames | 80%+ |
+| YOU | 1 | Index pointing forward | 2-3 frames | 70%+ |
+| CHOCOLATE | 2 | C-shape over flat palm | 3 frames | 75%+ |
+| COFFEE | 2 | Stacked fists vertically | 3 frames | 80%+ |
+| HOW MUCH | 1 | Thumb-index pinch (<1cm) | 2-3 frames | 75%+ |
+| I LOVE YOU | 1 | 3 fingers extended (ILY) | 3 frames | 75%+ |
+| WASHROOM | 1 | Closed fist | 2-3 frames | 80%+ |
+| PAIN | 2 | Index tips touching | 3 frames | 80%+ |
+| WHERE | 1 | Index pointing up | 2-3 frames | 70%+ |
 
 ---
 

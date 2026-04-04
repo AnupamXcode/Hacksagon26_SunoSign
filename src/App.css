@@ -46,6 +46,121 @@ html, body, #root {
   scrollbar-width: thin;
 }
 
+/* ===== CAMERA STABILITY - ANTI-SHIFT RULES ===== */
+
+/* Main container - Stable layout */
+main {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+/* Camera container - FIXED DIMENSIONS */
+[role="main"] > div > div:first-child > div:first-child {
+  /* Force fixed aspect ratio */
+  aspect-ratio: 16 / 9 !important;
+  min-height: 300px !important;
+  height: fit-content !important;
+  width: 100% !important;
+  overflow: hidden !important;
+  position: relative !important;
+}
+
+/* Video element - Never re-scale or re-render */
+video {
+  position: relative !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  display: block !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  transform: scaleX(-1) !important;
+}
+
+/* Canvas overlay - Absolute, no layout interference */
+canvas {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  pointer-events: none !important;
+  display: block !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  transform: scaleX(-1) !important;
+}
+
+/* Overlay layers - ABSOLUTE positioning only, never DOM reflow */
+.absolute.inset-0 {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  pointer-events: auto !important;
+  z-index: 5 !important;
+}
+
+/* Overlay badges and indicators */
+.absolute.top-3, 
+.absolute.top-4,
+.absolute.right-3,
+.absolute.right-4,
+.absolute.left-3,
+.absolute.left-4 {
+  position: absolute !important;
+  pointer-events: none !important;
+  z-index: 10 !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* Prevent layout shift from gesture output */
+[class*="detected"],
+[class*="gesture"],
+[class*="confidence"] {
+  position: absolute !important;
+  display: flex !important;
+  margin: 0 !important;
+  padding: auto !important;
+  width: fit-content !important;
+  height: fit-content !important;
+  pointer-events: none !important;
+}
+
+/* Suggestions container - FIXED MIN HEIGHT (no collapse/expand) */
+.glass-card.rounded-2xl.p-4,
+.glass-card.rounded-2xl.p-6 {
+  min-height: 160px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  position: relative !important;
+}
+
+/* Prevent scrollbar from triggering layout shift */
+html {
+  scrollbar-gutter: stable !important;
+  overflow-y: scroll !important;
+}
+
+/* Disable all transitions that could affect layout */
+* {
+  transition-property: opacity, color, background-color, box-shadow, border-color !important;
+  transition-property: var(--transition-property, opacity) !important;
+}
+
+/* NO transitions for layout-affecting properties */
+video, canvas {
+  transition: none !important; 
+  animation: none !important;
+}
+
 /* ===== ANIMATIONS ===== */
 
 @keyframes shimmerEffect {

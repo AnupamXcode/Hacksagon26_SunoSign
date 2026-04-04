@@ -1,5 +1,17 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { classifyGesture } from '@/lib/gestureEngine';
+import { 
+  updateMotionState, 
+  getAdaptiveFPS 
+} from '@/lib/dualDetectionEngine';
+import {
+  detectDeviceType,
+  getPerformanceParameters
+} from '@/lib/deviceDetection';
+import {
+  createFrameSkipper,
+  createAdaptiveProcessor
+} from '@/lib/mobileOptimization';
 
 function loadScript(src) {
   return new Promise((resolve, reject) => {
@@ -29,6 +41,34 @@ export function useHandDetection(videoRef, canvasRef, isActive, maxHands = 2) {
   const rafRef = useRef(0);
   const lastDetectRef = useRef(0);
 
+  // ========== MOTION DETECTION & ADAPTIVE FPS ==========
+  const lastLandmarksRef = useRef(null);
+  const motionMagnitudeRef = useRef(0);
+  const isMotionDetectedRef = useRef(false);
+  const currentFPSConfigRef = useRef({ min: 15, max: 20, throttle: 60 });
+  
+  // ========== MOBILE OPTIMIZATION ==========
+  const deviceTypeRef = useRef(detectDeviceType());
+  const frameSkipperRef = useRef(null);
+  const adaptiveProcessorRef = useRef(null);
+  const skipFrameCountRef = useRef(0);
+  
+  // Initialize mobile optimization
+  useEffect(() => {
+    const deviceType = detectDeviceType();
+    deviceTypeRef.current = deviceType;
+    
+    const params = getPerformanceParameters(deviceType);
+    
+    // Setup frame skipper for mobile
+    frameSkipperRef.current = createFrameSkipper(params.skipFrames);
+    
+    // Setup adaptive processor for mobile
+    if (deviceType !== 'desktop') {
+      adaptiveProcessorRef.current = createAdaptiveProcessor(params.fps);
+    }
+  }, []);
+
   const drawLandmarks = useCallback((canvas, allHands, width, height) => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
@@ -57,6 +97,10 @@ export function useHandDetection(videoRef, canvasRef, isActive, maxHands = 2) {
       }
     });
   }, []);
+
+  // ========== LATENCY & FPS TRACKING ==========
+  const frameTimestampsRef = useRef([]);
+  const lastProcessTimeRef = useRef(0);
 
   const initHands = useCallback(async () => {
     if (handsRef.current) return;
@@ -92,6 +136,19 @@ export function useHandDetection(videoRef, canvasRef, isActive, maxHands = 2) {
           }
           drawLandmarks(canvas, detectedHands, width, height);
           const primaryLandmarks = detectedHands[0].landmarks;
+          
+          // ========== MOTION DETECTION & ADAPTIVE FPS ==========
+          const state = { 
+            lastLandmarks: lastLandmarksRef.current,
+            isMotionDetected: isMotionDetectedRef.current
+          };
+          const motionDetected = updateMotionState(primaryLandmarks, state);
+          lastLandmarksRef.current = primaryLandmarks;
+          isMotionDetectedRef.current = motionDetected;
+          
+          // Update FPS config based on motion
+          currentFPSConfigRef.current = getAdaptiveFPS(motionDetected);
+          
           const result = classifyGesture(primaryLandmarks);
           setGesture(result);
           setCurrentLandmarks(primaryLandmarks);
@@ -103,6 +160,8 @@ export function useHandDetection(videoRef, canvasRef, isActive, maxHands = 2) {
             isAlphabet: false
           });
           setCurrentLandmarks(null);
+          lastLandmarksRef.current = null;
+          isMotionDetectedRef.current = false;
         }
         setHands(detectedHands);
       });
@@ -119,13 +178,50 @@ export function useHandDetection(videoRef, canvasRef, isActive, maxHands = 2) {
       rafRef.current = requestAnimationFrame(detect);
       return;
     }
+    
     const now = Date.now();
-    if (now - lastDetectRef.current > 100) {
+    
+    // ========== MOBILE FRAME SKIPPING ==========
+    if (frameSkipperRef.current && !frameSkipperRef.current.shouldProcess()) {
+      skipFrameCountRef.current++;
+      rafRef.current = requestAnimationFrame(detect);
+      return;
+    }
+    
+    // ========== ADAPTIVE FPS PROCESSING ==========
+    // Base: 15-20 FPS (60ms throttle)
+    // Motion detected: 25-30 FPS (33ms throttle)
+    // Mobile: 12-18 FPS (83ms throttle) before motion boost
+    const throttleMs = currentFPSConfigRef.current.throttle || 60;
+    
+    if (now - lastDetectRef.current > throttleMs) {
       lastDetectRef.current = now;
+      const processStartTime = performance.now();
+      
       try {
         await handsRef.current.send({
           image: videoRef.current
         });
+        
+        // ========== LATENCY TRACKING ==========
+        const latency = Math.round(performance.now() - processStartTime);
+        lastProcessTimeRef.current = latency;
+        
+        // ========== MOBILE ADAPTIVE PROCESSING ==========
+        if (adaptiveProcessorRef.current) {
+          adaptiveProcessorRef.current.recordFrameTime();
+          
+          // Reduce load if struggling
+          if (adaptiveProcessorRef.current.shouldReduceLoad()) {
+            adaptiveProcessorRef.current.adaptFPS();
+          }
+        }
+        
+        // Track FPS (rolling average of last 30 frames)
+        frameTimestampsRef.current.push(now);
+        if (frameTimestampsRef.current.length > 30) {
+          frameTimestampsRef.current.shift();
+        }
       } catch (e) {}
     }
     rafRef.current = requestAnimationFrame(detect);
@@ -144,10 +240,26 @@ export function useHandDetection(videoRef, canvasRef, isActive, maxHands = 2) {
     };
   }, [isActive, initHands, detect]);
 
+  // ========== FPS & LATENCY CALCULATOR ==========
+  const calculateFPS = useCallback(() => {
+    if (frameTimestampsRef.current.length < 2) return 0;
+    const timestamps = frameTimestampsRef.current;
+    const timeSpan = timestamps[timestamps.length - 1] - timestamps[0];
+    if (timeSpan === 0) return 0;
+    return Math.round((timestamps.length - 1) / (timeSpan / 1000));
+  }, []);
+
   return {
     gesture,
     loading,
     hands,
-    landmarks: currentLandmarks
+    landmarks: currentLandmarks,
+    fps: calculateFPS(),
+    latency: lastProcessTimeRef.current,
+    isMotionDetected: isMotionDetectedRef.current,
+    adaptiveFPS: currentFPSConfigRef.current,
+    device: deviceTypeRef.current,
+    skippedFrames: skipFrameCountRef.current,
+    adaptiveMetrics: adaptiveProcessorRef.current?.getFrameTimeRatio?.()
   };
 }

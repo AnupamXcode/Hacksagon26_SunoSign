@@ -93,6 +93,39 @@ function isSingleIndexPointingForward(landmarks) {
   return states[1] && !states[2] && !states[3] && !states[4] && pointingOut;
 }
 
+function isSingleIndexPointingDown(landmarks) {
+  // Index finger pointing downward
+  const states = getFingerStates(landmarks);
+  const indexTip = landmarks[8];
+  const indexMcp = landmarks[5];
+  // Index extended and pointing down
+  return states[1] && !states[2] && !states[3] && !states[4] && indexTip.y > indexMcp.y * 1.1;
+}
+
+function isFlatPalmDown(landmarks) {
+  // All fingers extended, palm facing downward
+  const states = getFingerStates(landmarks);
+  const tips = [8, 12, 16, 20];
+  const mcp = [5, 9, 13, 17];
+  // All fingers extended
+  const allExtended = states.filter((s, i) => i > 0).every(s => s);
+  // Check palm down (fingertips below MCPs)
+  const palmDown = tips.every((tipIdx, i) => landmarks[tipIdx].y > landmarks[mcp[i]].y);
+  return allExtended && palmDown;
+}
+
+function isPointingAtChest(landmarks) {
+  // Index pointing toward self/body center
+  const states = getFingerStates(landmarks);
+  const indexTip = landmarks[8];
+  const wrist = landmarks[0];
+  const indexMcp = landmarks[5];
+  const isRightHand = indexMcp.x < wrist.x;
+  // Index pointing inward (toward body center)
+  const pointingInward = isRightHand ? indexTip.x < indexMcp.x * 0.8 : indexTip.x > indexMcp.x * 1.2;
+  return states[1] && !states[2] && !states[3] && !states[4] && pointingInward;
+}
+
 function areHandsVerticallyAligned(left, right) {
   // Check if hands are stacked vertically (like for COFFEE gesture)
   const leftWrist = left[0];
@@ -402,6 +435,186 @@ const BUILTIN_PHRASES = [{
     }
     return 0;
   }
+},
+// ========== RETAILER PHRASES - PHARMACY ==========
+{
+  label: 'I NEED MEDICINE',
+  check: (_left, right) => {
+    // Right: index pointing to chest, Left: open palm asking
+    if (!right) return 0;
+    
+    const rStates = getFingerStates(right);
+    // Right index extended, others folded
+    const rValid = rStates[1] && !rStates[2] && !rStates[3] && !rStates[4];
+    
+    if (rValid && isPointingAtChest(right)) {
+      return 86;
+    }
+    return 0;
+  }
+},
+{
+  label: 'DO YOU HAVE THIS?',
+  check: (_left, right) => {
+    // Right: index pointing forward, Left: open palm
+    if (!right) return 0;
+    
+    if (isSingleIndexPointingForward(right)) {
+      return 84;
+    }
+    return 0;
+  }
+},
+{
+  label: 'WHAT IS THE DOSAGE?',
+  check: (left, right) => {
+    // Right: index up, Left: thumb-index pinch
+    if (!left || !right) return 0;
+    
+    const rStates = getFingerStates(right);
+    const lFingers = getFingerStates(left);
+    
+    // Right: index up (question indicator)
+    const rValid = isSingleIndexPointingUp(right);
+    
+    // Left: thumb and index pinch
+    const lValid = isThumbAndIndexPinch(left);
+    
+    if (rValid && lValid) {
+      return 85;
+    }
+    return 0;
+  }
+},
+// ========== RETAILER PHRASES - GROCERY ==========
+{
+  label: 'HOW MUCH IS THIS?',
+  check: (left, right) => {
+    // Right: thumb-index pinch, Left: index pointing
+    if (!left || !right) return 0;
+    
+    const rPinch = isThumbAndIndexPinch(right);
+    const lPointing = isSingleIndexPointingForward(left);
+    
+    if (rPinch && lPointing) {
+      return 83;
+    }
+    return 0;
+  }
+},
+{
+  label: 'GIVE ME THIS',
+  check: (left, right) => {
+    // Right: index pointing at item, Left: open palm receiving
+    if (!left || !right) return 0;
+    
+    const rPointing = isSingleIndexPointingForward(right);
+    const lFlat = isHandFlat(left);
+    
+    if (rPointing && lFlat) {
+      return 84;
+    }
+    return 0;
+  }
+},
+{
+  label: 'DO YOU HAVE FRESH STOCK?',
+  check: (left, right) => {
+    // Both hands: all fingers extended
+    if (!left || !right) return 0;
+    
+    const lOpen = isAllFingersExtended(left);
+    const rOpen = isAllFingersExtended(right);
+    
+    if (lOpen && rOpen) {
+      return 82;
+    }
+    return 0;
+  }
+},
+// ========== RETAILER PHRASES - TRANSPORT ==========
+{
+  label: 'TAKE ME HERE',
+  check: (left, right) => {
+    // Right: index forward, Left: index down
+    if (!left || !right) return 0;
+    
+    const rPointing = isSingleIndexPointingForward(right);
+    const lPointingDown = isSingleIndexPointingDown(left);
+    
+    if (rPointing && lPointingDown) {
+      return 85;
+    }
+    return 0;
+  }
+},
+{
+  label: 'HOW MUCH FARE?',
+  check: (left, right) => {
+    // Right: thumb-index pinch, Left: open palm
+    if (!right) return 0;
+    
+    if (isThumbAndIndexPinch(right)) {
+      return 83;
+    }
+    return 0;
+  }
+},
+{
+  label: 'IS THIS AVAILABLE?',
+  check: (left, right) => {
+    // Right: index pointing, Left: open palm
+    if (!right) return 0;
+    
+    if (isSingleIndexPointingForward(right)) {
+      return 81;
+    }
+    return 0;
+  }
+},
+// ========== RETAILER PHRASES - BANK ==========
+{
+  label: 'I WANT TO WITHDRAW MONEY',
+  check: (left, right) => {
+    // Right: fist, Left: open palm
+    if (!left || !right) return 0;
+    
+    const rFist = isFist(right);
+    const lFlat = isHandFlat(left);
+    
+    if (rFist && lFlat) {
+      const dist = distance(right[0], left[0]);
+      if (dist < 0.15) return 87;
+    }
+    return 0;
+  }
+},
+{
+  label: 'I WANT TO DEPOSIT MONEY',
+  check: (left, right) => {
+    // Right: palm down, Left: palm up
+    if (!left || !right) return 0;
+    
+    const rPalmDown = isFlatPalmDown(right);
+    const lFlat = isHandFlat(left);
+    
+    if (rPalmDown && lFlat) {
+      return 86;
+    }
+    return 0;
+  }
+},
+{
+  label: 'HELP ME WITH THIS FORM',
+  check: (_left, right) => {
+    // Right: index pointing, Left: open palm (similar to request)
+    if (!right) return 0;
+    
+    if (isSingleIndexPointingForward(right)) {
+      return 82;
+    }
+    return 0;
+  }
 }
 ];
 const PHRASE_SUGGESTIONS = {
@@ -425,7 +638,20 @@ const PHRASE_SUGGESTIONS = {
   'I LOVE YOU': ['I love you', 'You are special', 'I care about you'],
   'WASHROOM': ['Where is the washroom?', 'I need the washroom', 'Bathroom please'],
   'PAIN': ['I have pain', 'It hurts here', 'I am in pain'],
-  'WHERE': ['Where are you?', 'Where is it?', 'Where did you go?']
+  'WHERE': ['Where are you?', 'Where is it?', 'Where did you go?'],
+  // ========== RETAILER PHRASES SUGGESTIONS ==========
+  'I NEED MEDICINE': ['I need medicine', 'Can you help me get medicine?', 'Do you have medicine?'],
+  'DO YOU HAVE THIS?': ['Do you have this?', 'Is this available?', 'Can I get this?'],
+  'WHAT IS THE DOSAGE?': ['What is the dosage?', 'How much should I take?', 'What\'s the recommended dose?'],
+  'HOW MUCH IS THIS?': ['How much is this?', 'What is the price?', 'How much does it cost?'],
+  'GIVE ME THIS': ['Give me this', 'Can I have this?', 'I\'ll take this'],
+  'DO YOU HAVE FRESH STOCK?': ['Do you have fresh stock?', 'Is this fresh?', 'Do you have more in stock?'],
+  'TAKE ME HERE': ['Take me here', 'Can you take me to this location?', 'Go to this place'],
+  'HOW MUCH FARE?': ['How much is the fare?', 'What\'s the charge?', 'How much will it cost?'],
+  'IS THIS AVAILABLE?': ['Is this available?', 'Do you have this service?', 'Can you go this route?'],
+  'I WANT TO WITHDRAW MONEY': ['I want to withdraw money', 'Can I withdraw cash?', 'I need to withdraw funds'],
+  'I WANT TO DEPOSIT MONEY': ['I want to deposit money', 'I need to deposit funds', 'Can I deposit this amount?'],
+  'HELP ME WITH THIS FORM': ['Help me with this form', 'Can you help me fill this?', 'I need help with this statement']
 };
 export function classifyPhrase(hands) {
   const leftHand = hands.find(h => h.handedness === 'Left')?.landmarks || null;

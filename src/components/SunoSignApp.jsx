@@ -1,14 +1,13 @@
 // SunoSign AI — Main Application Component
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Camera, CameraOff, User, Hand, Volume2, VolumeX, Loader2, Hash, MessageSquare, Sparkles, Delete, RotateCcw, Moon, Sun } from 'lucide-react';
+import { Camera, CameraOff, User, Hand, Volume2, VolumeX, Loader2, Hash, MessageSquare, Sparkles, Delete, RotateCcw, Moon, Sun, AlertCircle, RotateCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCamera } from '@/hooks/useCamera';
 import { useHandDetection } from '@/hooks/useHandDetection';
 import { speak, speakEmergency, stopEmergency } from '@/lib/tts';
-import { classifyGesture } from '@/lib/gestureEngine';
 import ProfileModal from '@/components/ProfileModal';
 import { ChatPanel } from '@/components/ChatPanel';
 import { EmergencyOverlay } from '@/components/EmergencyOverlay';
@@ -17,10 +16,35 @@ import { NumberDetection } from '@/components/NumberDetection';
 import { PhraseDetection } from '@/components/PhraseDetection';
 import { getDomainWords, getDomainPhrases, wordToSentence, isEmergencyWord } from '@/lib/domainData';
 import { useProfile } from '@/hooks/useProfile';
+import {
+  createDualDetectionState,
+  detectFast,
+  detectStable,
+  decideHybrid,
+  confirmGesture,
+  shouldOutputWithAdaptiveDebounce,
+  fallbackToStable,
+  resolveConflict
+} from '@/lib/dualDetectionEngine';
+import {
+  detectDeviceType,
+  detectOrientation,
+  getDeviceCapabilities,
+  getTouchFriendlyDimensions
+} from '@/lib/deviceDetection';
+import { classifyGestureByContext } from '@/lib/contextAwareGesture';
 
 const STABILITY_FRAMES = 5;
 const COOLDOWN_MS = 1000;
 const FINGER_NAMES = ['Thumb', 'Index', 'Middle', 'Ring', 'Pinky'];
+
+// ========== DUAL DETECTION CONFIG ==========
+const MAX_LANDMARK_FRAMES = 5;        // 5-frame smoothing
+const CONFIDENCE_THRESHOLD = 5;       // Only update if >5% confidence change
+const FAST_CONFIDENCE_MIN = 80;       // Allow 80% for fast path
+const STABLE_CONFIDENCE_MIN = 85;     // Require 85% for stable path
+const ADAPTIVE_DEBOUNCE_MIN = 300;    // 300ms minimum debounce
+const ADAPTIVE_DEBOUNCE_MAX = 400;    // 400ms maximum debounce
 
 const DOMAINS_MAP = {
   general: 'General',
@@ -45,17 +69,108 @@ export default function SunoSignApp() {
     }
     return true;
   });
-  const { videoRef, isActive, error: camError, start, stop } = useCamera();
+  const { videoRef, isActive, error: camError, start, stop, retry, device: cameraDevice, orientation: cameraOrientation, capabilities } = useCamera();
   const canvasRef = useRef(null);
-  const { gesture: rawGesture, loading: modelLoading, hands } = useHandDetection(videoRef, canvasRef, isActive, mode === 'phrases' ? 2 : 1);
+  const { gesture: rawGesture, loading: modelLoading, hands, fps, latency, isMotionDetected, adaptiveFPS, device: detectionDevice, skippedFrames } = useHandDetection(videoRef, canvasRef, isActive, mode === 'phrases' ? 2 : 1);
   const { profile, save: saveProfile } = useProfile();
   const [profileOpen, setProfileOpen] = useState(false);
+
+  // ========== DEVICE INFO & RESPONSIVE STATE ==========
+  const [deviceType, setDeviceType] = useState(detectDeviceType());
+  const [orientation, setOrientation] = useState(detectOrientation());
+  const touchFriendlyDims = getTouchFriendlyDimensions();
+  
+  // Update device info on resize/orientation change
+  useEffect(() => {
+    const handleChange = () => {
+      setDeviceType(detectDeviceType());
+      setOrientation(detectOrientation());
+    };
+    
+    window.addEventListener('resize', handleChange);
+    window.addEventListener('orientationchange', handleChange);
+    
+    return () => {
+      window.removeEventListener('resize', handleChange);
+      window.removeEventListener('orientationchange', handleChange);
+    };
+  }, []);
+
+  // ========== DUAL DETECTION STATE ==========
+  const dualDetectionStateRef = useRef(createDualDetectionState());
+  
+  // ========== ADAPTIVE DEBOUNCE & OUTPUT CONTROL ==========
+  const lastOutputGestureRef = useRef('NONE');
+  const lastOutputTimeRef = useRef(0);
+  const outputModeRef = useRef('stable');
 
   const handleLogout = () => {
     logout();
     setProfileOpen(false);
     navigate('/');
   };
+
+  // ========== DUAL DETECTION PROCESSING W/ DEVICE INFO ==========
+  const processDualDetection = useCallback((gestureResult, contextValue, domainValue) => {
+    if (!gestureResult || gestureResult.gesture === 'NONE') {
+      return null;
+    }
+    
+    const state = dualDetectionStateRef.current;
+    
+    // Run both detection paths in parallel
+    const fastResult = detectFast(gestureResult, state);
+    const stableResult = detectStable(gestureResult, state);
+    
+    // Hybrid decision: combine both paths
+    const hybridResult = decideHybrid(fastResult, stableResult, state);
+    
+    if (!hybridResult) {
+      return null;
+    }
+    
+    // Check adaptive debounce: new gesture = immediate, same = 300-400ms
+    const shouldOutput = shouldOutputWithAdaptiveDebounce(
+      hybridResult,
+      lastOutputGestureRef.current,
+      lastOutputTimeRef.current,
+      state
+    );
+    
+    if (!shouldOutput) {
+      return null;
+    }
+    
+    // Update output tracking
+    lastOutputGestureRef.current = hybridResult.gesture;
+    lastOutputTimeRef.current = Date.now();
+    outputModeRef.current = hybridResult.mode;
+    
+    // Format standardized output with device info
+    return {
+      // Device and orientation
+      device: deviceType,
+      orientation: orientation,
+      
+      // Gesture data
+      gesture_detected: hybridResult.gesture,
+      confidence: hybridResult.confidence,
+      mode: hybridResult.mode,
+      context: contextValue || null,
+      domain: domainValue || null,
+      output_phrase: hybridResult.label,
+      
+      // Performance metrics
+      latency_ms: Math.round(latency || 0),
+      fps: Math.round(fps || 0),
+      isMotionDetected: isMotionDetected,
+      adaptiveFPS: adaptiveFPS?.min + '-' + adaptiveFPS?.max,
+      
+      // Mobile metrics
+      skippedFrames: skippedFrames || 0
+    };
+  }, [latency, fps, isMotionDetected, adaptiveFPS, skippedFrames, deviceType, orientation]);
+
   const [messages, setMessages] = useState([]);
   const [emergency, setEmergency] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
@@ -77,12 +192,17 @@ export default function SunoSignApp() {
 
   useEffect(() => {
     if (mode === 'alphabet' && hands.length > 0 && hands[0].landmarks) {
-      const result = classifyGesture(hands[0].landmarks);
+      // Classify gesture using context-aware engine (user or retailer mode)
+      const result = classifyGestureByContext(hands[0].landmarks, context);
+      
+      // Process through dual detection pipeline
+      const output = processDualDetection(result, context, domain);
+      
       setGesture(result);
     } else if (mode === 'alphabet') {
       setGesture({ gesture: 'NONE', confidence: 0, label: 'No gesture', isAlphabet: false });
     }
-  }, [hands, mode]);
+  }, [hands, mode, processDualDetection, context, domain]);
 
   // Stability state
   const bufferRef = useRef([]);
@@ -159,6 +279,7 @@ export default function SunoSignApp() {
     if (!isActive) {
       bufferRef.current = [];
       lastConfirmedRef.current = 'NONE';
+      dualDetectionStateRef.current = createDualDetectionState();
       setStableLetter(null);
     }
   }, [isActive]);
@@ -166,6 +287,7 @@ export default function SunoSignApp() {
   useEffect(() => {
     bufferRef.current = [];
     lastConfirmedRef.current = 'NONE';
+    dualDetectionStateRef.current = createDualDetectionState();
     setStableLetter(null);
     setCurrentWord('');
     setCompletedWords([]);
@@ -324,16 +446,56 @@ export default function SunoSignApp() {
             <div className="flex-1 min-w-0 space-y-4 lg:space-y-6">
               {/* Camera Feed Card - Fixed Height */}
               <div className="glass-card rounded-2xl lg:rounded-3xl border overflow-hidden group card-hover h-fit">
-                <div className="relative aspect-video bg-gradient-to-br from-primary/8 via-background to-secondary/8 backdrop-blur-sm overflow-hidden">
-                  <video ref={videoRef} className="w-full h-full object-cover" playsInline muted style={{ transform: 'scaleX(-1)' }} />
-                  <canvas ref={canvasRef} width={640} height={480}
-                    className="absolute inset-0 w-full h-full pointer-events-none" style={{ transform: 'scaleX(-1)' }} />
+                <div 
+                  className="relative bg-gradient-to-br from-primary/8 via-background to-secondary/8 backdrop-blur-sm overflow-hidden w-full"
+                  style={{
+                    aspectRatio: orientation === 'portrait' ? '9/16' : '16/9',
+                    minHeight: deviceType === 'mobile' ? '300px' : '400px',
+                    maxHeight: deviceType === 'mobile' ? '500px' : '600px',
+                    position: 'relative'
+                  }}
+                >
+                  <video 
+                    ref={videoRef} 
+                    className="w-full h-full object-cover" 
+                    playsInline 
+                    muted 
+                    style={{ 
+                      transform: 'scaleX(-1)',
+                      position: 'relative',
+                      width: '100%',
+                      height: '100%',
+                      display: isActive ? 'block' : 'none'
+                    }} 
+                  />
+                  <canvas 
+                    ref={canvasRef} 
+                    width={640} 
+                    height={480}
+                    className="absolute inset-0 w-full h-full pointer-events-none" 
+                    style={{ 
+                      transform: 'scaleX(-1)',
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      zIndex: 5
+                    }} 
+                  />
                   {!isActive && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 sm:gap-4 backdrop-blur-sm">
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 sm:gap-4 backdrop-blur-sm p-4">
                       {camError ? (
-                        <div className="text-center px-4 sm:px-6 fade-in">
-                          <CameraOff className="w-12 h-12 sm:w-16 sm:h-16 text-destructive mx-auto mb-3 animate-pulse" />
-                          <p className="text-destructive font-bold text-sm sm:text-base">{camError}</p>
+                        <div className="text-center fade-in max-w-sm">
+                          <div className="flex justify-center mb-3">
+                            <AlertCircle className="w-12 h-12 sm:w-16 sm:h-16 text-destructive" />
+                          </div>
+                          <p className="text-destructive font-bold text-sm sm:text-base mb-3">{camError}</p>
+                          <Button 
+                            onClick={retry}
+                            className="bg-gradient-to-r from-primary to-secondary text-white rounded-lg px-4 py-2 text-sm font-semibold flex items-center gap-2 mx-auto hover-scale"
+                          >
+                            <RotateCw className="w-4 h-4" />
+                            Retry
+                          </Button>
                         </div>
                       ) : (
                         <>
@@ -350,7 +512,7 @@ export default function SunoSignApp() {
                     </div>
                   )}
                   {isActive && (
-                    <div className="absolute top-3 right-3 sm:top-4 sm:right-4 flex gap-2 sm:gap-3 flex-wrap justify-end max-w-xs">
+                    <div className="absolute top-3 right-3 sm:top-4 sm:right-4 flex gap-2 sm:gap-3 flex-wrap justify-end max-w-xs" style={{ position: 'absolute', zIndex: 10 }}>
                        {hands && hands.length > 0 && (
                         <span className="animate-scale-in glass-card text-accent-foreground rounded-lg sm:rounded-xl px-3 sm:px-3.5 py-1.5 sm:py-2 text-xs font-bold backdrop-blur-xl">
                           ✋ {hands.length}
@@ -366,16 +528,28 @@ export default function SunoSignApp() {
                   )}
                 </div>
                 <div className="p-3 sm:p-5 flex flex-col sm:flex-row items-center gap-3 sm:gap-4">
-                  <Button onClick={isActive ? stop : start} className={`w-full sm:w-auto rounded-lg sm:rounded-xl h-11 sm:h-12 px-4 sm:px-6 font-bold text-sm sm:text-base transition-all duration-300 hover-scale ${
-                    isActive 
-                      ? 'bg-gradient-to-r from-destructive to-red-600 text-white shadow-glow-lg' 
-                      : 'bg-gradient-to-r from-primary to-secondary text-white shadow-glow-lg'
-                  }`}>
+                  <Button 
+                    onClick={isActive ? stop : start} 
+                    style={{
+                      minHeight: `${touchFriendlyDims.buttonHeight}px`,
+                      minWidth: `${touchFriendlyDims.buttonHeight}px`
+                    }}
+                    className={`rounded-lg sm:rounded-xl px-4 sm:px-6 font-bold text-sm sm:text-base transition-all duration-300 hover-scale ${
+                      isActive 
+                        ? 'bg-gradient-to-r from-destructive to-red-600 text-white shadow-glow-lg' 
+                        : 'bg-gradient-to-r from-primary to-secondary text-white shadow-glow-lg'
+                    }`}
+                  >
                     {isActive ? <><CameraOff className="w-4 h-4 sm:w-5 sm:h-5 mr-2" /> Stop</> : <><Camera className="w-4 h-4 sm:w-5 sm:h-5 mr-2" /> Start</>}
                   </Button>
                   <div className="text-xs text-muted-foreground font-medium">
                     {isActive ? '🟢 Live' : '⚪ Ready'}
                   </div>
+                  {deviceType === 'mobile' && (
+                    <div className="text-xs text-muted-foreground font-medium ml-auto">
+                      📱 {orientation}
+                    </div>
+                  )}
                 </div>
               </div>
 
