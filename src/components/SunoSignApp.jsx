@@ -16,8 +16,8 @@ import { PhraseDetection } from '@/components/PhraseDetection';
 import { getDomainWords, getDomainPhrases, wordToSentence, isEmergencyWord } from '@/lib/domainData';
 import { useProfile } from '@/hooks/useProfile';
 
-const STABILITY_FRAMES = 7;
-const COOLDOWN_MS = 2000;
+const STABILITY_FRAMES = 5;
+const COOLDOWN_MS = 1000;
 const FINGER_NAMES = ['Thumb', 'Index', 'Middle', 'Ring', 'Pinky'];
 
 const DOMAINS_MAP = {
@@ -284,17 +284,17 @@ export default function SunoSignApp() {
 
         <div className="flex items-center gap-2">
           <button onClick={() => setVoiceEnabled(!voiceEnabled)}
-            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300 smooth-transition hover-scale ${voiceEnabled ? 'bg-gradient-to-br from-primary to-secondary text-primary-foreground shadow-glow' : 'bg-muted/40 text-muted-foreground border border-white/10'}`}
+            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-150 ${voiceEnabled ? 'bg-gradient-to-br from-primary to-secondary text-primary-foreground shadow-glow' : 'bg-muted/40 text-muted-foreground border border-white/10'}`}
             title={voiceEnabled ? 'Mute' : 'Unmute'}>
             {voiceEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
           </button>
           <button onClick={() => setIsDarkMode(!isDarkMode)}
-            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-500 smooth-transition hover-scale ${isDarkMode ? 'bg-gradient-to-br from-indigo-500 to-purple-500 text-white shadow-glow' : 'bg-gradient-to-br from-yellow-400 to-orange-400 text-black shadow-glow'}`}
+            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200 ${isDarkMode ? 'bg-gradient-to-br from-indigo-500 to-purple-500 text-white shadow-glow' : 'bg-gradient-to-br from-yellow-400 to-orange-400 text-black shadow-glow'}`}
             title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}>
             {isDarkMode ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
           </button>
           <button onClick={() => setProfileOpen(true)}
-            className="w-10 h-10 rounded-xl bg-muted/40 flex items-center justify-center hover:bg-muted/60 transition-all duration-300 smooth-transition hover-scale border border-white/10">
+            className="w-10 h-10 rounded-xl bg-muted/40 flex items-center justify-center hover:bg-muted/60 transition-all duration-150 border border-white/10">
             <User className="w-5 h-5 text-muted-foreground" />
           </button>
         </div>

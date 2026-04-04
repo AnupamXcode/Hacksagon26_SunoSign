@@ -6,9 +6,16 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Smooth scrolling for the entire app */
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Prevent layout shift - no smooth scrolling */
 html, body, #root {
-  scroll-behavior: smooth;
+  scroll-behavior: auto !important;
+  scrollbar-gutter: stable;
 }
 
 /* Custom scrollbar for better UX */
@@ -26,9 +33,9 @@ html, body, #root {
   }
 }
 
-/* Ultra-smooth transitions */
+/* Ultra-smooth transitions (optimized for mobile) */
 button, a, [role="button"] {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Focus ring for accessibility */
@@ -40,7 +47,7 @@ button, a, [role="button"] {
 /* Smooth page transitions */
 @media (prefers-reduced-motion: no-preference) {
   html {
-    scroll-behavior: smooth;
+    scroll-behavior: auto;
   }
 }
 
@@ -60,5 +67,37 @@ button, a, [role="button"] {
   .dark .glass-card {
     background-color: rgba(20, 20, 20, 0.8);
   }
+}
+
+/* Mobile optimization */
+@media (max-width: 768px) {
+  body {
+    font-size: 16px;
+  }
+  
+  button, [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Disable expensive animations on mobile */
+  .float, .soft-glow {
+    animation: none !important;
+  }
+  
+  /* Faster transitions on mobile */
+  button, a, [role="button"] {
+    transition: all 0.1s ease-out !important;
+  }
+}
+
+/* GPU acceleration */
+.glass-card,
+button,
+video,
+canvas {
+  will-change: auto;
+  backface-visibility: hidden;
+  perspective: 1000px;
 }
 

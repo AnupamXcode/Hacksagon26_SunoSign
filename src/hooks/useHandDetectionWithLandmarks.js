@@ -113,7 +113,8 @@ export function useHandDetectionWithLandmarks(videoRef, canvasRef, isActive, max
     }
 
     const now = Date.now();
-    if (now - lastDetectRef.current > 60) {
+    // Reduced from 60ms to 33ms for faster detection (30 FPS)
+    if (now - lastDetectRef.current > 33) {
       lastDetectRef.current = now;
       try {
         await handsRef.current.send({ image: videoRef.current });

@@ -115,7 +115,9 @@
   }
 
   html {
-    scroll-behavior: smooth;
+    scroll-behavior: auto !important;
+    scrollbar-gutter: stable;
+    overflow-y: scroll;
   }
 
   body {
@@ -123,6 +125,7 @@
     font-family: var(--font-display);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    overflow-y: scroll;
   }
 
   /* Selection styling */
@@ -131,19 +134,19 @@
   }
 
   ::-webkit-scrollbar {
-    @apply w-3 h-3;
+    @apply w-2;
   }
 
   ::-webkit-scrollbar-track {
-    @apply bg-muted/30;
+    @apply bg-transparent;
   }
 
   ::-webkit-scrollbar-thumb {
-    @apply bg-primary/40 rounded-full;
+    @apply bg-primary/20 rounded-full;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-primary/60;
+    @apply bg-primary/40;
   }
 }
 
@@ -203,9 +206,9 @@
     }
   }
 
-  /* Fade in animation */
+  /* Fade in animation - optimized */
   .fade-in {
-    animation: fadeIn 0.3s ease-out;
+    animation: fadeIn 0.15s ease-out forwards;
   }
 
   @keyframes fadeIn {
@@ -217,9 +220,52 @@
     }
   }
 
-  /* Slide up animation */
+  /* Slide up animation - reduced duration */
   .slide-up {
     @apply animate-slide-down;
+  }
+
+  /* Mobile performance optimizations */
+  @media (max-width: 768px) {
+    .float {
+      animation: none !important;
+    }
+    .soft-glow {
+      animation: pulse-glow 1s ease-in-out infinite !important;
+    }
+    .gesture-pulse {
+      animation: pulse 0.5s ease-in-out infinite !important;
+    }
+    .hover-scale {
+      transition: none !important;
+    }
+    .smooth-transition {
+      transition: all 100ms ease-out !important;
+    }
+  }
+
+  /* GPU acceleration - prevent layout shifts */
+  .glass-card,
+  button,
+  [role="button"],
+  .camera-feed {
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    perspective: 1000px;
+  }
+
+  /* Prevent content reflow */
+  main {
+    contain: layout style paint;
+  }
+
+  /* Optimize animations for performance */
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 
   /* Ripple effect */
