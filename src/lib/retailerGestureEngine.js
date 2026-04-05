@@ -133,6 +133,8 @@ export function classifyRetailerGesture(landmarks) {
     if (angle > 50 && angle < 120) {
       return make('L', 88);
     }
+    // Fallback: still L if index and thumb extended
+    return make('L', 75);
   }
 
   // --- B (4 fingers extended, thumb across palm) ---
@@ -149,6 +151,8 @@ export function classifyRetailerGesture(landmarks) {
     if (indexMiddleAngle > 20 && indexMiddleAngle < 80) {
       return make('V', 85);
     }
+    // Fallback: still V if index and middle extended without ring/pinky
+    return make('V', 78);
   }
 
   // --- W (index, middle, ring extended) ---
@@ -161,6 +165,8 @@ export function classifyRetailerGesture(landmarks) {
     if (indexTip.y < indexMcp.y && middleTip.y < middleMcp.y) {
       return make('U', 82);
     }
+    // Fallback: still U shape with less strict y-check
+    return make('U', 76);
   }
 
   // --- R (index middle crossed) ---
@@ -169,6 +175,8 @@ export function classifyRetailerGesture(landmarks) {
     if (angle > 20 && angle < 50) {
       return make('R', 78);
     }
+    // Fallback: still R if index, middle, thumb extended with tight angle
+    return make('R', 72);
   }
 
   // --- K (thumb index middle extended in K shape) ---
@@ -177,6 +185,8 @@ export function classifyRetailerGesture(landmarks) {
     if (angle > 50 && angle < 120) {
       return make('K', 80);
     }
+    // Fallback: K if angle doesn't match R range, but still index+middle+thumb
+    return make('K', 72);
   }
 
   // --- Single index finger gestures ---
@@ -202,6 +212,14 @@ export function classifyRetailerGesture(landmarks) {
     if (!thumbExt && indexTip.y < indexMcp.y) {
       return make('Z', 68);
     }
+    
+    // Fallback: if only index extended, could be D or Z
+    if (indexTip.y < indexMcp.y && !thumbExt) {
+      return make('Z', 65);
+    }
+    if (indexTip.y < indexMcp.y && thumbExt) {
+      return make('D', 75);
+    }
   }
 
   // --- O (fingertips close to thumb forming circle) ---
@@ -212,6 +230,10 @@ export function classifyRetailerGesture(landmarks) {
         return make('O', 82);
       }
     }
+    // Fallback: if fingers curled but thumb not super close, could be O
+    if (thumbIndexDist < palmSize * 0.25) {
+      return make('O', 75);
+    }
   }
 
   // --- C (fingers partially curled in C shape) ---
@@ -221,6 +243,10 @@ export function classifyRetailerGesture(landmarks) {
       if (curveAngle > 35 && curveAngle < 110 && thumbIndexDist > palmSize * 0.25) {
         return make('C', 76);
       }
+    }
+    // Fallback: if fingers closed and thumb separated, likely C
+    if (thumbIndexDist > palmSize * 0.2) {
+      return make('C', 70);
     }
   }
 
@@ -235,6 +261,11 @@ export function classifyRetailerGesture(landmarks) {
 
   // --- CLOSED HAND GESTURES ---
   if (extCount === 0) {
+    // THUMBS_UP (thumb pointing up first)
+    if (thumbExt && thumbTip.y < landmarks[3].y && landmarks[3].y < landmarks[2].y) {
+      return make('THUMBS_UP', 86);
+    }
+
     // E (all curled except thumb across palm)
     if (!thumbExt && isThumbAcrossPalm(landmarks)) {
       const tipsNearThumb = dist(indexTip, thumbTip) < palmSize * 0.25;
@@ -242,6 +273,11 @@ export function classifyRetailerGesture(landmarks) {
         return make('E', 80);
       }
       return make('E', 72);
+    }
+
+    // H (thumb extended horizontally in fist)
+    if (thumbExt && thumbTip.y > landmarks[3].y) {
+      return make('H', 76);
     }
 
     // T (thumb between index and middle)
@@ -269,7 +305,7 @@ export function classifyRetailerGesture(landmarks) {
       return make('P', 74);
     }
 
-    // A (thumb to side, all fingers folded)
+    // A (thumb to side, all fingers folded, thumb not across)
     if (thumbExt && !isThumbAcrossPalm(landmarks)) {
       return make('A', 84);
     }
@@ -279,17 +315,7 @@ export function classifyRetailerGesture(landmarks) {
       return make('S', 78);
     }
 
-    // H (thumb extended in fist)
-    if (thumbExt && thumbTip.y > landmarks[3].y) {
-      return make('H', 76);
-    }
-
-    // THUMBS_UP (thumb pointing up)
-    if (thumbExt && thumbTip.y < landmarks[3].y && landmarks[3].y < landmarks[2].y) {
-      return make('THUMBS_UP', 86);
-    }
-
-    // FIST (default)
+    // FIST (default fallback for closed hand)
     return make('FIST', 85);
   }
 
@@ -303,11 +329,35 @@ export function classifyRetailerGesture(landmarks) {
     if (thumbIndexDist < palmSize * 0.15) {
       return make('F', 80);
     }
+    // Fallback: all fingers extended = open palm or F
+    return make('F', 75);
   }
 
   // --- J (pinky + thumb combo) ---
   if (!indexExt && !middleExt && !ringExt && pinkyExt && thumbExt) {
     return make('J', 72);
+  }
+
+  // ===== FALLBACK DETECTIONS FOR UNMATCHED EXTENDED FINGER STATES =====
+  
+  // If exactly 3 fingers extended (likely W variant or other)
+  if (extCount === 3 && !thumbExt) {
+    return make('W', 70);
+  }
+  
+  // If exactly 2 fingers extended besides index+middle, could be V/W variant
+  if (extCount === 2 && indexExt && middleExt) {
+    return make('V', 70);
+  }
+  
+  // If only middle extended
+  if (middleExt && !indexExt && !ringExt && !pinkyExt) {
+    return make('I', 70);
+  }
+  
+  // If only ring extended
+  if (ringExt && !indexExt && !middleExt && !pinkyExt) {
+    return make('I', 68);
   }
 
   return {

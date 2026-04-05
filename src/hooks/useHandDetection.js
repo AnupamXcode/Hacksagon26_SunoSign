@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
-import { classifyGesture } from '@/lib/gestureEngine';
+import { classifyGestureByContext } from '@/lib/contextAwareGesture';
 import { 
   updateMotionState, 
   getAdaptiveFPS 
@@ -27,7 +27,7 @@ function loadScript(src) {
   });
 }
 
-export function useHandDetection(videoRef, canvasRef, isActive, maxHands = 2) {
+export function useHandDetection(videoRef, canvasRef, isActive, maxHands = 2, context = 'user') {
   const [gesture, setGesture] = useState({
     gesture: 'NONE',
     confidence: 0,
@@ -149,7 +149,7 @@ export function useHandDetection(videoRef, canvasRef, isActive, maxHands = 2) {
           // Update FPS config based on motion
           currentFPSConfigRef.current = getAdaptiveFPS(motionDetected);
           
-          const result = classifyGesture(primaryLandmarks);
+          const result = classifyGestureByContext(primaryLandmarks, context);
           setGesture(result);
           setCurrentLandmarks(primaryLandmarks);
         } else {
@@ -225,7 +225,7 @@ export function useHandDetection(videoRef, canvasRef, isActive, maxHands = 2) {
       } catch (e) {}
     }
     rafRef.current = requestAnimationFrame(detect);
-  }, [videoRef]);
+  }, [videoRef, context]);
 
   useEffect(() => {
     if (isActive) {

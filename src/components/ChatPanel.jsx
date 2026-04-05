@@ -1,13 +1,9 @@
-import { useRef, useEffect } from 'react';
 import { MessageCircle } from 'lucide-react';
 
 export function ChatPanel({ messages }) {
-  const bottomRef = useRef(null);
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
+  // Auto-scroll disabled to prevent screen jumping during letter detection
+  // Users can manually scroll the chat if needed
+  
   return (
     <div className="glass-card rounded-2xl lg:rounded-3xl border flex flex-col h-full overflow-hidden group card-hover">
       {/* Header */}
@@ -51,7 +47,6 @@ export function ChatPanel({ messages }) {
             </div>
           </div>
         ))}
-        <div ref={bottomRef} />
       </div>
     </div>
   );

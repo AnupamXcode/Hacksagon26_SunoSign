@@ -71,7 +71,7 @@ export default function SunoSignApp() {
   });
   const { videoRef, isActive, error: camError, start, stop, retry, device: cameraDevice, orientation: cameraOrientation, capabilities } = useCamera();
   const canvasRef = useRef(null);
-  const { gesture: rawGesture, loading: modelLoading, hands, fps, latency, isMotionDetected, adaptiveFPS, device: detectionDevice, skippedFrames } = useHandDetection(videoRef, canvasRef, isActive, mode === 'phrases' ? 2 : 1);
+  const { gesture: rawGesture, loading: modelLoading, hands, fps, latency, isMotionDetected, adaptiveFPS, device: detectionDevice, skippedFrames } = useHandDetection(videoRef, canvasRef, isActive, mode === 'phrases' ? 2 : 1, context);
   const { profile, save: saveProfile } = useProfile();
   const [profileOpen, setProfileOpen] = useState(false);
 
